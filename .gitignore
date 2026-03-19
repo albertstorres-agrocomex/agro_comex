@@ -45,5 +45,9 @@ Thumbs.db
 # Vercel
 .vercel
 
-# Project rules (AI agents)
+# Project rules and technical docs (AI agents)
 CLAUDE.md
+PRD.md
+SPEC.md
+BACKEND_TECHNICAL_DOC.md
+FRONTEND_TECHNICAL_DOC.md
