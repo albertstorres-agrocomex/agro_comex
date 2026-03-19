@@ -59,7 +59,7 @@ export default function HeroSection() {
       </div>
 
       {/* Bottom dark band with feature cards */}
-      <div className="relative z-10 w-full mt-20 px-6 max-w-5xl mx-auto">
+      <div className="relative z-10 w-full mt-20 px-6 max-w-5xl mx-auto pb-1">
         {/* Key Features badge */}
         <div className="inline-flex items-center gap-2 bg-[oklch(0.87_0.185_125)]/15 border border-[oklch(0.87_0.185_125)]/25 rounded-full px-3 py-1 mb-6">
           <span className="text-[oklch(0.26_0.068_145)] text-xs font-medium">⚡ Funcionalidades</span>
