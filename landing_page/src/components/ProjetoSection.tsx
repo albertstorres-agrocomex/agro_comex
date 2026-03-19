@@ -4,7 +4,7 @@ const stack = [
   {
     icon: Globe,
     nome: "Frontend",
-    tech: "Next.js + Tailwind",
+    tech: "Next.js + Tailwind + Plotly",
     desc: "Interface web responsiva para visualização de posições, curvas de hedge e dashboards analíticos.",
     deploy: "Vercel",
     cor: "oklch(0.87 0.185 125)",
