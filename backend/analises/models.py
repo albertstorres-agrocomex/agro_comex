@@ -9,7 +9,7 @@ class SolicitacaoAnalise(models.Model):
         CONCLUIDO = "concluido"
         ERRO = "erro"
 
-    usiario_id = models.IntegerField() # É um IntegerField simples porque o schema SQL nao define FK para uma tabela de usuarios (ainda não criei) — quando o modelo User do Django estiver definido, trocar por ForeignKey(settings.AUTH_USER_MODEL, ...).
+    usuario_id = models.IntegerField() # É um IntegerField simples porque o schema SQL nao define FK para uma tabela de usuarios (ainda não criei) — quando o modelo User do Django estiver definido, trocar por ForeignKey(settings.AUTH_USER_MODEL, ...).
     commodity = models.ForeignKey(Comomodity, on_delete=models.PROTECT, null=False)
     tipo_derivativo = models.ForeignKey(TipoDerivativo, on_delete=models.PROTECT, null=False)
     preco_mercado_atual = models.IntegerField()

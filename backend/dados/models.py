@@ -2,7 +2,7 @@ from django.db import models
 from commodities.models import Comomodity
 
 
-# Utilidade da tebela é garantir uma série histórica local, para calcular a volatilidade com dados do próprio sistema. 
+# Utilidade da tebela é garantir uma série histórica local, para calcular a volatilidade com dados do próprio sistema. Possivel exclusão no futuro.
 class CacheDadosMercado(models.Model):
     commodity = models.ForeignKey(commodity, on_delete=models.PROTECT)
     data_preco = models.DateField()
