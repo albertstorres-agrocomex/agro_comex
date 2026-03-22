@@ -8,7 +8,11 @@
 
 ## Stack
 
-- A definir
+- Python + Django Rest Framework
+- Celery (worker assíncrono)
+- Redis (broker Celery + cache de resultados)
+- PostgreSQL (banco de dados principal)
+- Deploy: Render
 
 ## Endpoints
 
