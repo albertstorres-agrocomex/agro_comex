@@ -66,4 +66,41 @@ Falhar em validar esses campos resulta em erro de precificação silencioso ou r
 
 ## Endpoints
 
-- A definir
+Todos os endpoints seguem o padrao REST gerado pelo `DefaultRouter` do DRF. O prefixo base e `/api/v1/`.
+
+| Metodo | URL | Descricao |
+|--------|-----|-----------|
+| GET | `/api/v1/commodities/` | Lista todas as commodities |
+| POST | `/api/v1/commodities/` | Cria uma commodity |
+| GET | `/api/v1/commodities/{id}/` | Detalhe de uma commodity |
+| PUT/PATCH | `/api/v1/commodities/{id}/` | Atualiza uma commodity |
+| DELETE | `/api/v1/commodities/{id}/` | Remove uma commodity |
+| GET/POST | `/api/v1/meses_contrato_futuro/` | Lista / cria meses de contrato futuro |
+| GET/PUT/PATCH/DELETE | `/api/v1/meses_contrato_futuro/{id}/` | Detalhe / atualiza / remove |
+| GET/POST | `/api/v1/tipos_derivativo/` | Lista / cria tipos de derivativo |
+| GET/PUT/PATCH/DELETE | `/api/v1/tipos_derivativo/{id}/` | Detalhe / atualiza / remove |
+| GET/POST | `/api/v1/usuario/` | Lista / cria perfis de usuario |
+| GET/PUT/PATCH/DELETE | `/api/v1/usuario/{id}/` | Detalhe / atualiza / remove |
+| GET/POST | `/api/v1/cache_dados_mercado/` | Lista / cria registros de cache de preco |
+| GET/PUT/PATCH/DELETE | `/api/v1/cache_dados_mercado/{id}/` | Detalhe / atualiza / remove |
+| GET/POST | `/api/v1/solicitacao_analise/` | Lista / cria solicitacoes de analise |
+| GET/PUT/PATCH/DELETE | `/api/v1/solicitacao_analise/{id}/` | Detalhe / atualiza / remove |
+| GET/POST | `/api/v1/resultado_analise/` | Lista / cria resultados de analise |
+| GET/PUT/PATCH/DELETE | `/api/v1/resultado_analise/{id}/` | Detalhe / atualiza / remove |
+
+### Estrutura de URLs por app
+
+Cada app registra seu proprio router e expoe `urlpatterns = router.urls`. O `core/urls.py` inclui cada app sob o prefixo `/api/v1/`.
+
+### Observacoes sobre autorizacao
+
+Os ViewSets usam `ModelViewSet` sem restricao de permissao configurada — qualquer requisicao autenticada ou anonima tem acesso completo. Antes de ir para producao, e obrigatorio configurar `permission_classes` e `authentication_classes` nos ViewSets ou globalmente em `settings.py` (via `DEFAULT_PERMISSION_CLASSES`).
+
+### Typos nos nomes de modelos (pendente correcao futura)
+
+| Local | Nome atual | Nome correto |
+|-------|-----------|-------------|
+| `commodities/models.py` | `Comomodity` | `Commodity` |
+| `meses_contrato_futuro/models.py` | `MesContratoFurturo` | `MesContratoFuturo` |
+
+A correcao requer nova migration e renomeacao coordenada de ViewSets e serializers. Nao foi feita automaticamente para evitar migrations nao solicitadas.

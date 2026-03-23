@@ -23,6 +23,15 @@ export const navigation: NavSection[] = [
     ],
   },
   {
+    title: "Componentes",
+    items: [
+      { name: "BarChart", href: "/styleguide/components/bar-chart" },
+      { name: "LineChart", href: "/styleguide/components/line-chart" },
+      { name: "PieChart", href: "/styleguide/components/pie-chart" },
+      { name: "WorldMap", href: "/styleguide/components/world-map" },
+    ],
+  },
+  {
     title: "Core Técnico",
     items: [
       { name: "FedPredict", href: "/styleguide/components/fedpredict", tag: "FL" },

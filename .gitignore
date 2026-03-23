@@ -45,6 +45,10 @@ Thumbs.db
 # Vercel
 .vercel
 
+# Claude Code local settings
+.claude/*.local.json
+.claude/*.local.md
+
 # Project rules and technical docs (AI agents)
 CLAUDE.md
 PRD.md

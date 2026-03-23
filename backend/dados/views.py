@@ -1,3 +1,8 @@
-from django.shortcuts import render
+from rest_framework import viewsets
+from dados.models import CacheDadosMercado
+from dados.serializers import CacheDadosMercadoSerializer
 
-# Create your views here.
+
+class CacheDadosMercadoViewSet (viewsets.ModelViewSet):
+    queryset = CacheDadosMercado.objects.all()
+    serializer_class = CacheDadosMercadoSerializer
