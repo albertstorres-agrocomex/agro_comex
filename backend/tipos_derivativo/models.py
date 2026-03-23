@@ -1,7 +1,7 @@
 from django.db import models
 
 class TipoDerivativo(models.Model):
-    nome = models.Charfield(max_length=50)
+    nome = models.CharField(max_length=50)
     rotulo = models.CharField(max_length=50)
     descricao = models.TextField(null=True, blank=True)
     requer_barreira = models.BooleanField(default=False)

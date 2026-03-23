@@ -18,9 +18,17 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Third-party
     'rest_framework',
     'django_celery_results',
+
+    # Apps do projeto
+    
+    'commodities',
+    'tipos_derivativo',
+    'meses_contrato_futuro',
+    'dados',
+    'analises',
+    'usuario',
 ]
 
 MIDDLEWARE = [
