@@ -15,6 +15,11 @@ export default function DashboardPage() {
     }
   }, [isLoading, isAuthenticated, router])
 
+  async function handleLogout() {
+    await logout()
+    router.push('/')
+  }
+
   if (isLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background">
@@ -25,11 +30,6 @@ export default function DashboardPage() {
 
   if (!isAuthenticated) return null
 
-  async function handleLogout() {
-    await logout()
-    router.push('/')
-  }
-
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4">
       <div className="space-y-1 text-center">
@@ -37,10 +37,10 @@ export default function DashboardPage() {
           AgroComex
         </p>
         <h1 className="text-2xl font-bold text-foreground">
-          Bem-vindo, {user?.primeiro_nome || 'usuario'}
+          Bem-vindo, {user!.primeiro_nome || 'usuario'}
         </h1>
         <p className="text-sm text-foreground/60">
-          Grupo: {user?.group || '—'}
+          Grupo: {user!.group || '—'}
         </p>
       </div>
 
