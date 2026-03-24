@@ -331,6 +331,43 @@ Exibe de forma interativa:
 
 ---
 
+## Servico de Autenticacao
+
+### Dependencia adicionada
+
+| Pacote | Versao | Uso |
+|--------|--------|-----|
+| `axios` | ^1.9.0 | Cliente HTTP com interceptors para refresh automatico de token |
+
+### Arquivos do servico
+
+| Arquivo | Responsabilidade |
+|---------|-----------------|
+| `frontend/src/config/apiConfig.ts` | Exporta `API_BASE_URL` lido de `NEXT_PUBLIC_API_URL` (fallback: `http://localhost:8000`) |
+| `frontend/src/authStore.ts` | Modulo singleton que encapsula o access token em memoria. Exporta: `getAccessToken()`, `setAccessToken()`, `clearAccessToken()` |
+| `frontend/services/api.ts` | Instancia axios com interceptors de request e resposta |
+
+### Estrategia de armazenamento de tokens
+
+- **Access token**: armazenado apenas em memoria via `authStore.ts`. Some ao recarregar a pagina (intencional — nunca persiste em localStorage ou cookies acessiveis ao JS).
+- **Refresh token**: cookie `HttpOnly` gerenciado pelo servidor. Enviado automaticamente nas requisicoes com `withCredentials: true`.
+
+### Fluxo do interceptor de refresh (api.ts)
+
+1. Qualquer requisicao que receba HTTP 401 dispara um `POST /api/v1/authentication/token/refresh/`.
+2. O cookie HttpOnly e enviado automaticamente (nenhuma acao necessaria no cliente).
+3. Se o refresh for bem-sucedido: novo access token salvo em memoria via `setAccessToken()`, requisicao original refeita com o novo token.
+4. Se o refresh falhar (cookie expirado ou blacklistado): `clearAccessToken()` chamado, Promise rejeitada — a UI trata o redirecionamento para login quando a pagina existir.
+5. Flag `_retry` no objeto de config da requisicao impede loops infinitos em caso de 401 repetido.
+
+### Variavel de ambiente
+
+| Variavel | Valor padrao | Onde definir |
+|----------|-------------|--------------|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | `frontend/.env.local` (nao commitado) |
+
+---
+
 ## Regras de Frontend
 
 - Usar exclusivamente CSS custom properties (`var(--token)`) — nunca hex, rgb ou hsl hardcoded.

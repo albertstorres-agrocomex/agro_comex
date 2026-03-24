@@ -199,6 +199,56 @@ Configuradas via migration `dados/0002_periodic_tasks.py`. Todas ativas por padr
 
 ---
 
+## Autenticacao JWT
+
+### Dependencias adicionadas
+
+| Pacote | Versao | Uso |
+|--------|--------|-----|
+| `django-cors-headers` | 4.9.0 | CORS para requisicoes do frontend |
+| `djangorestframework-simplejwt` | 5.5.1 | JWT com suporte a blacklist |
+
+### App de autenticacao: `backend/authentication/`
+
+| Arquivo | Conteudo |
+|---------|----------|
+| `views.py` | 4 views: `CustomTokenObtainPairView`, `CustomTokenRefreshView`, `LogoutView`, `MeuPerfilView` |
+| `serializers.py` | 3 serializers: `CustomTokenObtainPairSerializer`, `MeuPerfilSerializer`, `LogoutSerializer` |
+| `urls.py` | 5 endpoints registrados sob `/api/v1/authentication/` |
+
+### Estrategia de tokens (OWASP A02/A07)
+
+- **Access token**: retornado no body da resposta. Armazenado em memoria no frontend (nunca em localStorage). Expira em 15 minutos.
+- **Refresh token**: definido como cookie `HttpOnly + Secure + SameSite="Lax"`, path restrito a `/api/v1/authentication/`. Expira em 7 dias. Rotacao ativada. Blacklist ativada.
+
+### Endpoints de autenticacao
+
+| Metodo | Path | Auth | Descricao |
+|--------|------|------|-----------|
+| POST | `/api/v1/authentication/token/` | Nao | Login. Body: `{username, password}`. Retorna: `{access, group, primeiro_nome}`. Seta cookie refresh. |
+| POST | `/api/v1/authentication/token/refresh/` | Nao (cookie) | Renova access token via cookie HttpOnly. Retorna: `{access, group, primeiro_nome}`. |
+| POST | `/api/v1/authentication/token/verify/` | Nao | Verifica validade de um access token. |
+| POST | `/api/v1/authentication/logout/` | Bearer | Blacklista o refresh token e apaga o cookie. |
+| GET | `/api/v1/authentication/me/` | Bearer | Retorna perfil do usuario autenticado. |
+| PATCH | `/api/v1/authentication/me/` | Bearer | Atualiza email e/ou senha. Body: `{email?, senha_atual?, nova_senha?, confirmar_senha?}`. |
+
+### Configuracoes relevantes (settings.py)
+
+- `SIMPLE_JWT`: access=15min, refresh=7 dias, rotacao ativada, blacklist ativado.
+- `JWT_REFRESH_COOKIE_*`: name=`refresh_token`, path=`/api/v1/authentication/`, `httponly=True`, `secure=not DEBUG`.
+- `CORS_ALLOWED_ORIGINS`: `["http://localhost:3000"]` — adicionar origin de producao antes do deploy.
+- `DEFAULT_AUTHENTICATION_CLASSES`: apenas `JWTAuthentication` (sem `BasicAuthentication`).
+- `DEFAULT_THROTTLE_RATES`: `auth=10/min`.
+
+### Tipos de usuario
+
+| Tipo | Descricao |
+|------|-----------|
+| `Usuarios` | Tabela existente (app `usuario`), relacionada por `OneToOneField` ao `auth.User` do Django. E o cliente do sistema. |
+| `Administradores` | Nao modelado ainda. Sera adicionado ao final do projeto. Referencias no codigo de autenticacao estao comentadas com `# TODO`. |
+
+---
+
 ## Typos nos nomes de modelos (pendente correcao futura)
 
 | Local | Nome atual | Nome correto |
