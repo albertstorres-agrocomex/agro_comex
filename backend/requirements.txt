@@ -17,9 +17,11 @@ click-repl==0.3.0
 cron-descriptor==1.4.5
 Django==6.0.3
 django-celery-beat==2.9.0
+django-cors-headers==4.9.0
 django-timezone-field==7.2.1
 django_celery_results==2.6.0
 djangorestframework==3.17.0
+djangorestframework-simplejwt==5.5.1
 duckdb==1.5.1
 et_xmlfile==2.0.0
 h11==0.16.0
