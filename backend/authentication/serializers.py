@@ -63,6 +63,8 @@ class MeuPerfilSerializer(serializers.Serializer):
         return data
 
 
+# Scaffold para validacao de logout via body (nao utilizado atualmente — LogoutView usa cookie HttpOnly).
+# TODO: utilizar quando a UI de login for implementada e precisar de validacao de body.
 class LogoutSerializer(serializers.Serializer):
     """Serializer para logout seguro. Valida que o refresh token esta presente."""
     refresh = serializers.CharField(
