@@ -26,7 +26,13 @@ export default function LoginPage() {
       await login(email, password)
       router.push('/dashboard')
     } catch (err: unknown) {
-      const status = (err as { status?: number }).status ?? 500
+      const status =
+        err !== null &&
+        typeof err === 'object' &&
+        'status' in err &&
+        typeof (err as Record<string, unknown>).status === 'number'
+          ? (err as { status: number }).status
+          : 500
       setError(getErrorMessage(status))
     } finally {
       setIsLoading(false)
