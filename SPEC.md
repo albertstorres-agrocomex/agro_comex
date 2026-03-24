@@ -40,6 +40,10 @@ agro_comex/
 | Redis | 6.4.0 | Message broker (Celery) |
 | PostgreSQL (psycopg2-binary 2.9.11) | — | Banco de dados |
 | django-celery-results | 2.6.0 | Armazenamento de resultados Celery no banco |
+| django-celery-beat | 2.7.0 | Agendamento de tarefas periodicas (cron) |
+| python-bcb | — | Cliente BCB SGS para series temporais (cambio, SELIC, IPCA) |
+| agrobr | — | Cliente B3 (futuros) e CEPEA (precos) |
+| pandas | — | Normalizacao de DataFrames na camada de limpeza de dados |
 | python-decouple | 3.8 | Gerenciamento de variaveis de ambiente |
 
 ### Configuracoes relevantes
@@ -170,11 +174,35 @@ Exemplo:
 
 ```
 POST /api/v1/solicitacao_analise/
-  -> SolicitacaoAnalise criada (status: aguardanto)
-  -> Celery worker processa
-  -> ResultadoAnalise salvo no banco
-  -> status atualizado para concluido (ou erro)
+  -> SolicitacaoAnalise criada (status: aguardando)
+  -> perform_create() enfileira processar_analise.delay(solicitacao_id)
+  -> worker: status = processando
+  -> worker: calcula volatilidade, taxa_juros, nivel_acumulacao
+  -> worker: salva ResultadoAnalise
+  -> worker: status = concluido
+  -> em caso de excecao: retry ate 3x, depois status = erro
 ```
+
+### Fluxo de atualizacao de dados de mercado (periodico)
+
+```
+Cron (celery-beat)
+  -> tarefas: atualizar_cambio / atualizar_selic_ipca / atualizar_futuros_b3 / atualizar_precos_cepea
+  -> busca dados da fonte (BCB SGS / agrobr)
+  -> limpeza/normalizacao (dados/limpeza/*.py) -> lista de dicts
+  -> persistir_cache_dados_mercado() -> upsert em CacheDadosMercado
+```
+
+### Apps Django (modulos internos relevantes)
+
+| App | Modulo | Arquivo | Descricao |
+|-----|--------|---------|-----------|
+| `analises` | Tarefas | `analises/tasks.py` | `processar_analise` — task principal de precificacao |
+| `dados` | Servico | `dados/servicos.py` | `persistir_cache_dados_mercado` — upsert de cache |
+| `dados` | Tarefas externas | `dados/tasks/agrobr.py` | Integracao B3 e CEPEA |
+| `dados` | Tarefas externas | `dados/tasks/bcb.py` | Integracao BCB (cambio, SELIC, IPCA) |
+| `dados` | Normalizacao | `dados/limpeza/agrobr.py` | DataFrame B3/CEPEA -> dicts padronizados |
+| `dados` | Normalizacao | `dados/limpeza/bcb.py` | Series BCB -> dicts padronizados |
 
 ---
 

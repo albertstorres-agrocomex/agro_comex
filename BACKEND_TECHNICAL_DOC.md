@@ -38,10 +38,32 @@ Perfil de usuário da aplicação, estendendo `auth.User` do Django via `OneToOn
 ### `dados`
 Cache local de preços de fechamento para cálculo de volatilidade histórica. Possível remoção futura, substituída por consulta direta à API de mercado.
 
+Submodulos internos do app `dados`:
+
+| Modulo | Caminho | Descricao |
+|--------|---------|-----------|
+| Servico de persistencia | `dados/servicos.py` | `persistir_cache_dados_mercado()` — upsert de registros normalizados em `CacheDadosMercado` |
+| Tarefas de integracao | `dados/tasks/agrobr.py` | Busca futuros B3 e precos CEPEA via biblioteca `agrobr` |
+| Tarefas de integracao | `dados/tasks/bcb.py` | Busca cambio (USD/BRL, EUR/BRL) e indices (SELIC, IPCA) via `python-bcb` |
+| Pipeline de normalizacao | `dados/limpeza/agrobr.py` | Converte DataFrames B3/CEPEA para lista de dicts padronizados |
+| Pipeline de normalizacao | `dados/limpeza/bcb.py` | Converte series BCB para lista de dicts padronizados |
+
 ### `analises`
-Núcleo do sistema. Gerencia o ciclo completo de precificação:
-- `SolicitacaoAnalise`: recebe os parâmetros do usuário e enfileira a tarefa no Celery
-- `ResultadoAnalise`: armazena os dados calculados pelo worker (volatilidade, taxa de juros, grade de preços em `dados_brutos`)
+Nucleo do sistema. Gerencia o ciclo completo de precificacao:
+- `SolicitacaoAnalise`: recebe os parametros do usuario e enfileira a tarefa no Celery via `perform_create()` no ViewSet
+- `ResultadoAnalise`: armazena os dados calculados pelo worker (volatilidade, taxa de juros, grade de precos em `dados_brutos`)
+
+Tarefa Celery (`analises/tasks.py`):
+
+| Tarefa | Descricao |
+|--------|-----------|
+| `processar_analise(solicitacao_id)` | Tarefa `@shared_task` com retry automatico (max 3, intervalo 30s). Transiciona `SolicitacaoAnalise` entre os estados `processando`, `concluido` e `erro`. Cria `ResultadoAnalise` com os campos calculados. |
+
+Fluxo de estados de `SolicitacaoAnalise`:
+```
+aguardando -> processando -> concluido
+                          -> erro (com retry automatico ate 3x)
+```
 
 ---
 
@@ -96,7 +118,39 @@ Cada app registra seu proprio router e expoe `urlpatterns = router.urls`. O `cor
 
 Os ViewSets usam `ModelViewSet` sem restricao de permissao configurada — qualquer requisicao autenticada ou anonima tem acesso completo. Antes de ir para producao, e obrigatorio configurar `permission_classes` e `authentication_classes` nos ViewSets ou globalmente em `settings.py` (via `DEFAULT_PERMISSION_CLASSES`).
 
-### Typos nos nomes de modelos (pendente correcao futura)
+---
+
+## Pipeline de Integracao de Dados Externos
+
+### Fontes configuradas
+
+| Fonte | Dados | Tarefa Celery | Horario (BRT, dias uteis) |
+|-------|-------|---------------|---------------------------|
+| BCB SGS | Cambio USD/BRL (serie 10813), EUR/BRL (21619) | `atualizar_cambio` | 19:00 |
+| BCB SGS | SELIC (serie 1), IPCA (serie 433) | `atualizar_selic_ipca` | 20:00 |
+| B3 via `agrobr` | Futuros: boi, cafe, etanol, milho, soja | `atualizar_futuros_b3` | 19:30 |
+| CEPEA via `agrobr` | Precos de fechamento por commodity | `atualizar_precos_cepea` | 18:00 |
+| CONAB | Estimativa de safra | *(task stub)* | 08:00, dia 5 do mes |
+| MDIC/Comex | Dados de exportacao | *(task stub)* | 08:00, dia 6 do mes |
+| PROHORT | Precos de hortigranjeiros | *(task stub)* | 08:00 |
+
+### Pipeline de normalizacao
+
+Todos os dados externos passam pelo modulo `dados/limpeza/` antes de ser persistidos:
+
+1. Dados brutos (DataFrame pandas) recebidos da fonte
+2. Normalizacao para lista de dicts com campos: `codigo_commodity`, `data_preco`, `preco_fechamento` (inteiro em centavos), `fonte`
+3. Persistencia via `persistir_cache_dados_mercado()` com `update_or_create()` (upsert por `commodity + data_preco + fonte`)
+
+Precos sao armazenados como inteiros (centavos) para evitar imprecisao de ponto flutuante.
+
+### Tarefas periodicas (django-celery-beat)
+
+Configuradas via migration `dados/0002_periodic_tasks.py`. Todas ativas por padrao, timezone `America/Sao_Paulo`.
+
+---
+
+## Typos nos nomes de modelos (pendente correcao futura)
 
 | Local | Nome atual | Nome correto |
 |-------|-----------|-------------|

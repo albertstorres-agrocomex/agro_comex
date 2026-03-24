@@ -45,6 +45,11 @@ Plataforma de inteligencia para o agronegocio com foco em comercio exterior, int
   - Resultados de Analise
 - [x] Validacao condicional de campos em SolicitacaoAnalise (baseada em TipoDerivativo)
 - [x] Celery + Redis configurados para processamento assincrono de analises
+- [x] Tarefa Celery `processar_analise` com retry automatico (max 3x) e transicao de estados
+- [x] Pipeline de integracao de dados externos: BCB (cambio, SELIC, IPCA), B3 (futuros), CEPEA (precos)
+- [x] Servico de persistencia com upsert (`persistir_cache_dados_mercado`)
+- [x] Pipeline de normalizacao de dados (`dados/limpeza/`) com precos em centavos (int)
+- [x] 7 tarefas periodicas configuradas via django-celery-beat (cron, timezone America/Sao_Paulo)
 - [x] Serializacao JSON via Django REST Framework
 
 ### Frontend
