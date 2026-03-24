@@ -122,27 +122,76 @@ Os ViewSets usam `ModelViewSet` sem restricao de permissao configurada — qualq
 
 ## Pipeline de Integracao de Dados Externos
 
-### Fontes configuradas
+### Fontes x Commodities suportadas
+
+| Fonte | Soja (ZS) | Milho (ZC) | Cafe (KC) | Acucar (SB) |
+|-------|-----------|------------|-----------|-------------|
+| CEPEA via `agrobr` | sim | sim | sim | nao (nao suportado pela lib) |
+| B3 via `agrobr` | sim (soja_fob, soja_cross) | sim | sim (cafe_arabica) | nao (sem contrato) |
+| ComexStat via `agrobr` | sim | sim | sim | sim |
+| BCB SGS | n/a (indicador macro) | n/a (indicador macro) | n/a (indicador macro) | n/a (indicador macro) |
+| PROHORT via `agrobr` | nao (hortifruti) | nao (hortifruti) | nao (hortifruti) | nao (hortifruti) |
+| Estimativa Safra (CONAB) | sim | sim | nao (nao suportado) | nao (nao suportado) |
+
+### Tarefas Celery configuradas
 
 | Fonte | Dados | Tarefa Celery | Horario (BRT, dias uteis) |
 |-------|-------|---------------|---------------------------|
 | BCB SGS | Cambio USD/BRL (serie 10813), EUR/BRL (21619) | `atualizar_cambio` | 19:00 |
 | BCB SGS | SELIC (serie 1), IPCA (serie 433) | `atualizar_selic_ipca` | 20:00 |
-| B3 via `agrobr` | Futuros: boi, cafe, etanol, milho, soja | `atualizar_futuros_b3` | 19:30 |
-| CEPEA via `agrobr` | Precos de fechamento por commodity | `atualizar_precos_cepea` | 18:00 |
-| CONAB | Estimativa de safra | *(task stub)* | 08:00, dia 5 do mes |
-| MDIC/Comex | Dados de exportacao | *(task stub)* | 08:00, dia 6 do mes |
-| PROHORT | Precos de hortigranjeiros | *(task stub)* | 08:00 |
+| B3 via `agrobr` | Futuros: milho, soja (ZC, ZS) | `atualizar_futuros_b3` | 19:30 |
+| CEPEA via `agrobr` | Precos spot: soja, milho, cafe | `atualizar_precos_cepea` | 18:00 |
+| CONAB via `agrobr` | Estimativa de safra: soja, milho | *(task stub)* | 08:00, dia 5 do mes |
+| ComexStat via `agrobr` | Exportacao: soja, milho, cafe, acucar | *(task stub)* | 08:00, dia 6 do mes |
+| PROHORT via `agrobr` | Precos de hortifruti (nao aplica ao MVP) | *(task stub)* | 08:00 |
+
+### Mapeamento nome fonte -> codigo banco
+
+Definido em `backend/dados/limpeza/agrobr.py` como `COMMODITY_NOME_PARA_CODIGO`:
+
+```python
+COMMODITY_NOME_PARA_CODIGO = {
+    "soja":         "ZS",  # CEPEA, ComexStat
+    "soja_cross":   "ZS",  # B3
+    "soja_fob":     "ZS",  # B3
+    "milho":        "ZC",  # CEPEA, B3, ComexStat
+    "cafe":         "KC",  # CEPEA, ComexStat
+    "cafe_arabica": "KC",  # B3
+    "acucar":       "SB",  # ComexStat (unica fonte que suporta acucar)
+}
+```
 
 ### Pipeline de normalizacao
 
-Todos os dados externos passam pelo modulo `dados/limpeza/` antes de ser persistidos:
+Dados de commodity (precos, exportacao):
 
 1. Dados brutos (DataFrame pandas) recebidos da fonte
-2. Normalizacao para lista de dicts com campos: `codigo_commodity`, `data_preco`, `preco_fechamento` (inteiro em centavos), `fonte`
-3. Persistencia via `persistir_cache_dados_mercado()` com `update_or_create()` (upsert por `commodity + data_preco + fonte`)
+2. Normalizacao em `dados/limpeza/agrobr.py` para lista de dicts: `codigo_commodity`, `data_preco`, `preco_fechamento` (inteiro em centavos), `fonte`
+3. Persistencia via `persistir_cache_dados_mercado()` em `CacheDadosMercado` (upsert por `commodity + data_preco + fonte`)
 
-Precos sao armazenados como inteiros (centavos) para evitar imprecisao de ponto flutuante.
+Dados macroeconomicos (BCB):
+
+1. DataFrame com index=data e colunas=indicadores recebido do `python-bcb`
+2. Normalizacao em `dados/limpeza/bcb.py` para lista de dicts: `indicador`, `data`, `valor` (float), `fonte`
+3. Persistencia via `persistir_dados_macroeconomicos()` em `DadosMacroeconomicos` (upsert por `indicador + data`)
+
+Precos de commodity sao armazenados como inteiros (centavos) para evitar imprecisao de ponto flutuante. Indicadores macro usam `DecimalField(max_digits=18, decimal_places=6)`.
+
+### Model DadosMacroeconomicos
+
+Indicadores macroeconomicos do BCB sao persistidos em tabela separada (`dados_macroeconomicos`), pois nao sao precos de commodity. Campos: `indicador`, `data`, `valor`, `fonte`, `obtido_em`.
+
+Indicadores suportados: `USD_BRL`, `EUR_BRL`, `SELIC`, `IPCA`.
+
+Usado em `ResultadoAnalise` para `taxa_juros_utilizada` e correcao monetaria.
+
+### Limitacoes conhecidas
+
+- **CEPEA**: nao suporta `acucar` via agrobr (validos: soja, milho, boi, cafe, trigo, algodao). `COMMODITIES_CEPEA = ["soja", "milho", "cafe"]`.
+- **B3**: nao tem contrato de acucar via agrobr. Contratos `cafe_conillon`, `boi`, `etanol` nao mapeados para commodities do banco — sao ignorados silenciosamente.
+- **Estimativa Safra (CONAB)**: requer Playwright (pode nao estar instalado no ambiente). Fallback IBGE usa schema incompativel com o contrato CONAB (`ContractViolation` antes de chegar ao normalizador). Cafe e acucar nao suportados. `CULTURAS = ["soja", "milho"]`.
+- **PROHORT**: cobre exclusivamente hortifruti (TOMATE, BATATA, LARANJA etc.). Nenhuma das 4 commodities do MVP retorna registros em `CacheDadosMercado` — comportamento esperado para o MVP.
+- **BCB**: indicadores macro nao sao commodities. Persistidos em `DadosMacroeconomicos`, nao em `CacheDadosMercado`.
 
 ### Tarefas periodicas (django-celery-beat)
 

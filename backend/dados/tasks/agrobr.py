@@ -60,8 +60,9 @@ def atualizar_precos_cepea(self):
     from dados.limpeza.agrobr import normalizar_precos_cepea
     from dados.servicos import persistir_cache_dados_mercado
 
-    # Adicionar ou remover commodities conforme necessidade
-    COMMODITIES_CEPEA = ["soja", "milho", "cafe", "acucar"]
+    # Acucar NAO e suportado pelo CEPEA via agrobr
+    # (validos: soja, milho, boi, cafe, trigo, algodao)
+    COMMODITIES_CEPEA = ["soja", "milho", "cafe"]
 
     todos_registros = []
     for commodity in COMMODITIES_CEPEA:
@@ -91,7 +92,10 @@ def atualizar_estimativa_safra(self):
     from dados.limpeza.agrobr import normalizar_estimativa_safra
     from dados.servicos import persistir_cache_dados_mercado
 
-    CULTURAS = ["soja", "milho", "cafe", "acucar"]
+    # Cafe e acucar NAO sao suportados por estimativa_safra via agrobr
+    # (validos: soja, milho, arroz, feijao, trigo, algodao)
+    # CONAB requer Playwright; fallback IBGE usa schema incompativel com o contrato.
+    CULTURAS = ["soja", "milho"]
 
     todos_registros = []
     for cultura in CULTURAS:
@@ -107,7 +111,7 @@ def atualizar_estimativa_safra(self):
             continue
 
     persistidos = persistir_cache_dados_mercado(todos_registros)
-    logger.info("Safra CONAB: %d registros persistidos:", persistidos)
+    logger.info("Safra CONAB: %d registros persistidos.", persistidos)
     return {"fonte": "CONAB_SAFRA", "registros": persistidos}
 
 

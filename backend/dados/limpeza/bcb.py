@@ -1,11 +1,17 @@
-import pandas as pd 
+import pandas as pd
+
 
 def normalizar_serie_bcb(df: pd.DataFrame, fonte: str) -> list[dict]:
     """
-    Recebe DataFrame do python-bcb (index=data, colunas=series)
-    e retorna lista de dicts para persistencia em CacheDadosMercado.
+    Normaliza DataFrame do python-bcb (index=data, colunas=series)
+    para persistencia em DadosMacroeconomicos.
 
-    preco_fechamento armazena o valor em centavos (x100) para evitar float.
+    Cada coluna do DataFrame vira um indicador:
+      USD_BRL, EUR_BRL, SELIC, IPCA
+
+    Retorna lista de dicts com: indicador, data, valor, fonte.
+    Usa valor float direto (sem conversao para centavos — indicadores
+    macro nao sao precos de commodity).
     """
     registros = []
     df = df.dropna(how="all")
@@ -14,13 +20,12 @@ def normalizar_serie_bcb(df: pd.DataFrame, fonte: str) -> list[dict]:
         for data, valor in df[coluna].dropna().items():
             try:
                 registros.append({
-                    "codigo_commodity": coluna,
-                    "data_preco": data.date() if hasattr(data, "date")
-                    else data,
-                    "preco_fechamento": int(round(float(valor) *100)),
-                    "fonte": fonte,
+                    "indicador": str(coluna),
+                    "data":      data.date() if hasattr(data, "date") else data,
+                    "valor":     float(valor),
+                    "fonte":     fonte,
                 })
             except (ValueError, TypeError):
                 continue
-    
+
     return registros
