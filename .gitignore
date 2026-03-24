@@ -49,6 +49,9 @@ Thumbs.db
 .claude/*.local.json
 .claude/*.local.md
 
+# Planos de implementacao (gerados por agentes)
+docs/superpowers/plans/
+
 # Project rules and technical docs (AI agents)
 CLAUDE.md
 PRD.md
