@@ -51,8 +51,13 @@ npx vercel --prod
 frontend/src/
   app/
     globals.css              # Tokens de design (OKLCH, radii, tipografia)
-    layout.tsx               # Root layout — fontes + providers
-    page.tsx                 # Home (placeholder)
+    layout.tsx               # Root layout — fontes + providers (wraps children com <Providers>)
+    page.tsx                 # Pagina de login (rota raiz `/`) — "use client", usa useAuth()
+    providers.tsx            # "use client" wrapper para AuthProvider (necessario pois layout.tsx e Server Component)
+    dashboard/
+      page.tsx               # Dashboard placeholder — verifica sessao, exibe nome/grupo, botao logout
+    login/
+      page.tsx               # Redirect para `/`
     styleguide/
       layout.tsx             # Layout do styleguide com sidebar de navegacao
       page.tsx               # Pagina interativa de design tokens
@@ -67,6 +72,9 @@ frontend/src/
     LineChartComex.tsx       # Componente de grafico de linha
     PieChartComex.tsx        # Componente de grafico de pizza/donut
     WorldMapComex.tsx        # Componente de mapa mundial coropletico
+    system/
+      auth/
+        LoginCard.tsx        # Card de login — prop error?: string (role="alert", text-destructive)
     ui/                      # Componentes shadcn/ui tematizados
       card.tsx
       button.tsx
@@ -75,6 +83,10 @@ frontend/src/
       radio-group.tsx
       label.tsx
       chart.tsx              # ChartContainer + wrappers Recharts
+  contexts/
+    AuthContext.tsx          # React Context de autenticacao global — expoe useAuth()
+  services/
+    authService.ts           # Servico HTTP de auth: login(), refreshToken(), logout()
   lib/
     utils.ts                 # cn() — merge de classes Tailwind
   types/
@@ -87,7 +99,9 @@ frontend/src/
 
 | Rota | Descricao |
 |---|---|
-| `/` | Home — placeholder |
+| `/` | Login |
+| `/login` | Redirect permanente para `/` |
+| `/dashboard` | Dashboard principal — requer autenticacao |
 | `/styleguide` | Design tokens — cores, tipografia, radii |
 | `/styleguide/components/bar-chart` | Showcase do BarChartComex |
 | `/styleguide/components/line-chart` | Showcase do LineChartComex |
@@ -331,9 +345,9 @@ Exibe de forma interativa:
 
 ---
 
-## Servico de Autenticacao
+## Autenticacao JWT
 
-### Dependencia adicionada
+### Dependencias
 
 | Pacote | Versao | Uso |
 |--------|--------|-----|
@@ -346,18 +360,48 @@ Exibe de forma interativa:
 | `frontend/src/config/apiConfig.ts` | Exporta `API_BASE_URL` lido de `NEXT_PUBLIC_API_URL` (fallback: `http://localhost:8000`) |
 | `frontend/src/authStore.ts` | Modulo singleton que encapsula o access token em memoria. Exporta: `getAccessToken()`, `setAccessToken()`, `clearAccessToken()` |
 | `frontend/services/api.ts` | Instancia axios com interceptors de request e resposta |
+| `frontend/src/services/authService.ts` | Servico HTTP de autenticacao: `login()`, `refreshToken()`, `logout()`. Usa `fetch` nativo com `credentials: 'include'`. Lanca `{ status: number }` em erros HTTP e `{ status: 0 }` em erros de rede. |
+| `frontend/src/contexts/AuthContext.tsx` | React Context de estado de auth global. Expoe o hook `useAuth()`. O `AuthProvider` executa silent refresh no mount (`isLoading=true` ate a resolucao). `login()` lanca excecao em caso de erro; `logout()` e best-effort. |
+| `frontend/src/app/providers.tsx` | Wrapper `"use client"` para o `AuthProvider`. Necessario porque `layout.tsx` e um Server Component e nao pode renderizar Context diretamente. |
+
+### Interfaces
+
+```typescript
+interface UserProfile {
+  group: string
+  primeiro_nome: string
+}
+
+interface AuthContextValue {
+  user: UserProfile | null
+  isAuthenticated: boolean
+  isLoading: boolean
+  login(email: string, password: string): Promise<void>
+  logout(): Promise<void>
+}
+```
 
 ### Estrategia de armazenamento de tokens
 
 - **Access token**: armazenado apenas em memoria via `authStore.ts`. Some ao recarregar a pagina (intencional — nunca persiste em localStorage ou cookies acessiveis ao JS).
-- **Refresh token**: cookie `HttpOnly` gerenciado pelo servidor. Enviado automaticamente nas requisicoes com `withCredentials: true`.
+- **Refresh token**: cookie `HttpOnly` gerenciado pelo servidor. Enviado automaticamente nas requisicoes com `credentials: 'include'`.
+
+### Fluxo de autenticacao
+
+| Etapa | Acao |
+|-------|------|
+| Login | `POST /api/auth/token/` — access token salvo em `authStore` (memoria); refresh token chega como cookie HttpOnly |
+| Silent refresh | `AuthProvider` chama `POST /api/auth/token/refresh/` no mount para restaurar sessao sem exigir novo login |
+| Logout | `POST /api/auth/logout/` (best-effort) — limpa `authStore` e estado do contexto |
+| Pos-login | Redireciona para `/dashboard` |
+| Dashboard sem sessao | Se `!isAuthenticated` apos o carregamento, redireciona para `/` |
 
 ### Fluxo do interceptor de refresh (api.ts)
 
 1. Qualquer requisicao que receba HTTP 401 dispara um `POST /api/v1/authentication/token/refresh/`.
 2. O cookie HttpOnly e enviado automaticamente (nenhuma acao necessaria no cliente).
 3. Se o refresh for bem-sucedido: novo access token salvo em memoria via `setAccessToken()`, requisicao original refeita com o novo token.
-4. Se o refresh falhar (cookie expirado ou blacklistado): `clearAccessToken()` chamado, Promise rejeitada — a UI trata o redirecionamento para login quando a pagina existir.
+4. Se o refresh falhar (cookie expirado ou blacklistado): `clearAccessToken()` chamado, Promise rejeitada — a UI trata o redirecionamento para login.
 5. Flag `_retry` no objeto de config da requisicao impede loops infinitos em caso de 401 repetido.
 
 ### Variavel de ambiente
