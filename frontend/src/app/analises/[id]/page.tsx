@@ -5,30 +5,45 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { TopMenu } from "@/components/system/layout/TopMenu";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import {
-  fetchAnalise,
-  aprovarAnalise,
-  reprovarAnalise,
-  type AnaliseData,
+  fetchSolicitacao,
+  type SolicitacaoAnaliseData,
 } from "@/services/analiseService";
 
 const STATUS_CONFIG = {
-  aprovado: { label: "Aprovado", variant: "success" as const },
-  pendente: { label: "Pendente", variant: "warning" as const },
-  rejeitado: { label: "Rejeitado", variant: "destructive" as const },
-  em_analise: { label: "Em Analise", variant: "info" as const },
+  aguardando: { label: "Aguardando", variant: "warning" as const },
+  processando: { label: "Processando", variant: "info" as const },
+  concluido: { label: "Concluido", variant: "success" as const },
+  erro: { label: "Erro", variant: "destructive" as const },
 };
+
+function statusBgColor(status: SolicitacaoAnaliseData["status"]) {
+  switch (status) {
+    case "concluido": return "var(--success)";
+    case "erro": return "var(--destructive)";
+    case "processando": return "var(--info)";
+    default: return "var(--warning)";
+  }
+}
+
+function statusFgColor(status: SolicitacaoAnaliseData["status"]) {
+  switch (status) {
+    case "concluido": return "var(--success-foreground)";
+    case "erro": return "var(--destructive-foreground)";
+    case "processando": return "var(--info-foreground)";
+    default: return "var(--warning-foreground)";
+  }
+}
 
 export default function AnaliseDetailPage() {
   const router = useRouter();
   const params = useParams();
   const { isAuthenticated, isLoading, logout } = useAuth();
 
-  const [analise, setAnalise] = useState<AnaliseData | null>(null);
+  const [solicitacao, setSolicitacao] = useState<SolicitacaoAnaliseData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
   async function handleLogout() {
@@ -41,38 +56,27 @@ export default function AnaliseDetailPage() {
     if (!isAuthenticated) { router.push("/"); return; }
     const id = Number(params.id);
     if (isNaN(id)) { setNotFound(true); setLoading(false); return; }
-    fetchAnalise(id)
-      .then(setAnalise)
+    fetchSolicitacao(id)
+      .then(setSolicitacao)
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [isAuthenticated, isLoading, router, params.id]);
 
-  async function handleAprovar() {
-    if (!analise) return;
-    setActionLoading(true);
-    try {
-      const updated = await aprovarAnalise(analise.id);
-      setAnalise(updated);
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleReprovar() {
-    if (!analise) return;
-    setActionLoading(true);
-    try {
-      const updated = await reprovarAnalise(analise.id);
-      setAnalise(updated);
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
   if (isLoading) return null;
   if (!isAuthenticated) return null;
 
-  const cfg = analise ? STATUS_CONFIG[analise.status] : null;
+  const cfg = solicitacao ? STATUS_CONFIG[solicitacao.status] : null;
+
+  const mesLabel = solicitacao
+    ? solicitacao.mes_contrato_ticket ??
+      (solicitacao.mes_contrato_codigo && solicitacao.mes_contrato_ano
+        ? `${solicitacao.mes_contrato_codigo}/${solicitacao.mes_contrato_ano}`
+        : null)
+    : null;
+
+  const title = solicitacao
+    ? `${solicitacao.commodity_nome} — ${solicitacao.tipo_derivativo_rotulo}${mesLabel ? ` (${mesLabel})` : ""}`
+    : null;
 
   return (
     <div className="h-screen overflow-hidden bg-background">
@@ -98,17 +102,17 @@ export default function AnaliseDetailPage() {
             </Link>
             {loading ? (
               <div className="h-5 w-48 bg-muted rounded animate-pulse" />
-            ) : analise ? (
+            ) : solicitacao ? (
               <>
                 <h1 className="text-base font-bold text-foreground truncate flex-1">
-                  {analise.title}
+                  {title}
                 </h1>
                 {cfg && (
                   <Badge
                     variant="secondary"
                     style={{
-                      background: `var(--${analise.status === "aprovado" ? "success" : analise.status === "rejeitado" ? "destructive" : analise.status === "em_analise" ? "info" : "warning"})`,
-                      color: `var(--${analise.status === "aprovado" ? "success" : analise.status === "rejeitado" ? "destructive" : analise.status === "em_analise" ? "info" : "warning"}-foreground)`,
+                      background: statusBgColor(solicitacao.status),
+                      color: statusFgColor(solicitacao.status),
                     }}
                     className="text-[10px] px-1.5 py-0 h-[18px] font-semibold shrink-0"
                   >
@@ -117,7 +121,7 @@ export default function AnaliseDetailPage() {
                 )}
               </>
             ) : (
-              <h1 className="text-base font-bold text-foreground">Analise nao encontrada</h1>
+              <h1 className="text-base font-bold text-foreground">Solicitacao nao encontrada</h1>
             )}
           </div>
 
@@ -129,45 +133,75 @@ export default function AnaliseDetailPage() {
                 ))}
               </div>
             ) : notFound ? (
-              <p className="text-sm text-muted-foreground">Analise nao encontrada.</p>
-            ) : analise ? (
+              <p className="text-sm text-muted-foreground">Solicitacao nao encontrada.</p>
+            ) : solicitacao ? (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Solicitada {analise.time_ago} atras
+                  Criada em{" "}
+                  {new Date(solicitacao.criado_em).toLocaleDateString("pt-BR", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </p>
 
-                {analise.resultado ? (
-                  <div className="rounded-[var(--radius-xl)] border border-border bg-background p-4">
-                    <h3 className="text-sm font-semibold text-foreground mb-2">Resultado da Analise</h3>
-                    <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                      {analise.resultado}
+                {solicitacao.resultado ? (
+                  <div className="rounded-[var(--radius-xl)] border border-border bg-background p-4 space-y-3">
+                    <h3 className="text-sm font-semibold text-foreground">Resultado da Analise</h3>
+                    {solicitacao.resultado.nivel_acumulacao !== null && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">
+                          Nivel de Acumulacao
+                        </p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {solicitacao.resultado.nivel_acumulacao}
+                        </p>
+                      </div>
+                    )}
+                    {solicitacao.resultado.volatilidade_utilizada && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">
+                          Volatilidade Utilizada
+                        </p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {solicitacao.resultado.volatilidade_utilizada}
+                        </p>
+                      </div>
+                    )}
+                    {solicitacao.resultado.taxa_juros_utilizada && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">
+                          Taxa de Juros Utilizada
+                        </p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {solicitacao.resultado.taxa_juros_utilizada}
+                        </p>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Calculado em{" "}
+                      {new Date(solicitacao.resultado.calculado_em).toLocaleDateString("pt-BR", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </p>
                   </div>
                 ) : (
                   <div className="rounded-[var(--radius-xl)] border border-border bg-muted/40 p-4">
                     <p className="text-sm text-muted-foreground">
-                      Aguardando processamento...
+                      {solicitacao.status === "aguardando"
+                        ? "Aguardando processamento..."
+                        : solicitacao.status === "processando"
+                        ? "Processando analise..."
+                        : solicitacao.status === "erro"
+                        ? "Ocorreu um erro ao processar esta analise."
+                        : "Aguardando resultado..."}
                     </p>
-                  </div>
-                )}
-
-                {/* Botoes de acao */}
-                {analise.status === "em_analise" && (
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      onClick={handleAprovar}
-                      disabled={actionLoading}
-                      className="bg-accent text-accent-foreground px-5 py-2 rounded-full text-sm font-semibold hover:brightness-105 transition-all disabled:opacity-50"
-                    >
-                      {actionLoading ? "Aguarde..." : "Aprovar"}
-                    </button>
-                    <button
-                      onClick={handleReprovar}
-                      disabled={actionLoading}
-                      className="bg-destructive text-destructive-foreground px-5 py-2 rounded-full text-sm font-semibold hover:brightness-105 transition-all disabled:opacity-50"
-                    >
-                      {actionLoading ? "Aguarde..." : "Reprovar"}
-                    </button>
                   </div>
                 )}
               </div>
@@ -189,32 +223,32 @@ export default function AnaliseDetailPage() {
                     <div key={i} className="h-4 bg-muted rounded animate-pulse w-3/4" />
                   ))}
                 </div>
-              ) : analise ? (
+              ) : solicitacao ? (
                 <div className="space-y-4">
                   {/* Imagem + codigo */}
                   <div className="flex items-center gap-3">
-                    {analise.commodity_image_url ? (
+                    {solicitacao.commodity_imagem_url ? (
                       <img
-                        src={analise.commodity_image_url}
-                        alt={analise.commodity_code}
+                        src={solicitacao.commodity_imagem_url}
+                        alt={solicitacao.commodity_nome}
                         className="w-12 h-12 rounded-[var(--radius-md)] object-cover"
                       />
                     ) : (
                       <div className="w-12 h-12 rounded-[var(--radius-md)] bg-muted flex items-center justify-center">
                         <span className="text-xs font-bold text-muted-foreground uppercase">
-                          {analise.commodity_code.slice(0, 3)}
+                          {solicitacao.commodity_codigo.slice(0, 3)}
                         </span>
                       </div>
                     )}
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                        {analise.commodity_code}
+                        {solicitacao.commodity_codigo}
                       </p>
                       <p className="text-sm font-bold text-foreground">
-                        {analise.sale_price_currency}{" "}
-                        {Number(analise.sale_price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        {solicitacao.commodity_moeda}{" "}
+                        {Number(solicitacao.preco_mercado_atual).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                         <span className="text-xs font-normal text-muted-foreground ml-1">
-                          {analise.sale_price_unit}
+                          {solicitacao.commodity_unidade}
                         </span>
                       </p>
                     </div>
@@ -222,15 +256,13 @@ export default function AnaliseDetailPage() {
 
                   {/* Detalhes em linha */}
                   {[
-                    { label: "Tipo de Contrato", value: analise.contract_type },
-                    { label: "Ano de Vencimento", value: String(analise.expiry_year) },
-                    {
-                      label: "Quantidade",
-                      value: analise.quantidade_toneladas
-                        ? `${Number(analise.quantidade_toneladas).toLocaleString("pt-BR")} t`
-                        : "—",
-                    },
-                    { label: "Valor Total", value: analise.total_contract_value || "—" },
+                    { label: "Tipo de Derivativo", value: solicitacao.tipo_derivativo_nome },
+                    { label: "Rotulo", value: solicitacao.tipo_derivativo_rotulo },
+                    ...(mesLabel ? [{ label: "Mes do Contrato", value: mesLabel }] : []),
+                    ...(solicitacao.posicao ? [{ label: "Posicao", value: solicitacao.posicao === "comprador" ? "Comprador" : "Vendedor" }] : []),
+                    ...(solicitacao.nivel_barreira !== null && solicitacao.nivel_barreira !== undefined
+                      ? [{ label: "Nivel de Barreira", value: String(solicitacao.nivel_barreira) }]
+                      : []),
                   ].map(({ label, value }) => (
                     <div key={label}>
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">
@@ -239,17 +271,6 @@ export default function AnaliseDetailPage() {
                       <p className="text-sm font-semibold text-foreground">{value}</p>
                     </div>
                   ))}
-
-                  {/* Pais */}
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">
-                      Pais de Referencia
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                      <MapPin size={11} className="text-muted-foreground" />
-                      <p className="text-sm font-semibold text-foreground">{analise.country}</p>
-                    </div>
-                  </div>
                 </div>
               ) : null}
             </div>
