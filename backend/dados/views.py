@@ -1,10 +1,10 @@
 from rest_framework import viewsets
 from rest_framework.views import APIView
-from rest_framework.generics import RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework import status as http_status
+from django.db import transaction
 from django.db.models import Count, Q
 
 from dados.models import CacheDadosMercado, Analise
@@ -13,6 +13,7 @@ from dados.serializers import (
     AnaliseSerializer,
     AnaliseCreateSerializer,
     AnaliseDetailSerializer,
+    AnaliseStatusCountSerializer,
 )
 
 
@@ -62,7 +63,6 @@ class IndiceExportacaoView(APIView):
 
 class AnalisePagination(PageNumberPagination):
     page_size = 6
-    page_size_query_param = "page_size"
     max_page_size = 6
 
 
@@ -88,15 +88,20 @@ class AnaliseCreateView(APIView):
         serializer = AnaliseCreateSerializer(
             data=request.data, context={"request": request}
         )
-        if serializer.is_valid():
-            analise = serializer.save()
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
+
+        analise = serializer.save()
+        # Disparar task apos commit para garantir que o registro esta visivel no DB
+        def _dispatch():
             from dados.tasks.processar_analise import processar_analise
             processar_analise.delay(analise.id)
-            return Response(
-                AnaliseDetailSerializer(analise).data,
-                status=http_status.HTTP_201_CREATED,
-            )
-        return Response(serializer.errors, status=http_status.HTTP_400_BAD_REQUEST)
+
+        transaction.on_commit(_dispatch)
+        return Response(
+            AnaliseDetailSerializer(analise).data,
+            status=http_status.HTTP_201_CREATED,
+        )
 
 
 class AnaliseDetailView(APIView):
@@ -115,11 +120,14 @@ class AnaliseAprovarView(APIView):
 
     def patch(self, request, pk):
         try:
-            analise = Analise.objects.get(pk=pk, user=request.user, status="em_analise")
+            analise = Analise.objects.get(pk=pk, user=request.user)
         except Analise.DoesNotExist:
+            return Response(status=http_status.HTTP_404_NOT_FOUND)
+
+        if analise.status != "em_analise":
             return Response(
-                {"detail": "Analise nao encontrada ou nao esta em analise."},
-                status=http_status.HTTP_404_NOT_FOUND,
+                {"detail": "Analise nao esta com status em_analise."},
+                status=http_status.HTTP_409_CONFLICT,
             )
         analise.status = "aprovado"
         analise.save(update_fields=["status"])
@@ -131,11 +139,14 @@ class AnaliseReprovarView(APIView):
 
     def patch(self, request, pk):
         try:
-            analise = Analise.objects.get(pk=pk, user=request.user, status="em_analise")
+            analise = Analise.objects.get(pk=pk, user=request.user)
         except Analise.DoesNotExist:
+            return Response(status=http_status.HTTP_404_NOT_FOUND)
+
+        if analise.status != "em_analise":
             return Response(
-                {"detail": "Analise nao encontrada ou nao esta em analise."},
-                status=http_status.HTTP_404_NOT_FOUND,
+                {"detail": "Analise nao esta com status em_analise."},
+                status=http_status.HTTP_409_CONFLICT,
             )
         analise.status = "rejeitado"
         analise.save(update_fields=["status"])
@@ -154,4 +165,5 @@ class AnaliseStatusCountView(APIView):
             rejeitado=Count("id", filter=Q(status="rejeitado")),
         )
         counts["total"] = sum(counts.values())
-        return Response(counts)
+        serializer = AnaliseStatusCountSerializer(counts)
+        return Response(serializer.data)
