@@ -8,26 +8,27 @@ import { AnaliseCard } from "@/components/system/analise/AnaliseCard";
 import { AnaliseStatusPieChart } from "@/components/system/analise/AnaliseStatusPieChart";
 import { NovaAnaliseModal } from "@/components/system/analise/NovaAnaliseModal";
 import {
-  fetchAnalises,
-  fetchAnaliseStatusCount,
-  type AnaliseData,
-  type AnaliseStatus,
-  type AnaliseStatusCount,
+  fetchSolicitacoes,
+  fetchSolicitacaoStatusCount,
+  type SolicitacaoAnaliseData,
+  type SolicitacaoStatus,
+  type SolicitacaoStatusCount,
 } from "@/services/analiseService";
 import { apiFetch } from "@/services/authService";
 
-const STATUS_TABS: { key: "todos" | AnaliseStatus; label: string }[] = [
+const STATUS_TABS: { key: "todos" | SolicitacaoStatus; label: string }[] = [
   { key: "todos", label: "Todos" },
-  { key: "pendente", label: "Pendente" },
-  { key: "em_analise", label: "Em Analise" },
-  { key: "aprovado", label: "Aprovado" },
-  { key: "rejeitado", label: "Rejeitado" },
+  { key: "aguardando", label: "Aguardando" },
+  { key: "processando", label: "Processando" },
+  { key: "concluido", label: "Concluido" },
+  { key: "erro", label: "Erro" },
 ];
 
 interface CommodityOption {
+  id: number;
   codigo: string;
   nome: string;
-  preco_atual?: string;
+  preco_atual?: string | null;
   moeda: string;
   unidade: string;
 }
@@ -36,10 +37,10 @@ export default function AnalisesPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading, logout } = useAuth();
 
-  const [analises, setAnalises] = useState<AnaliseData[]>([]);
-  const [statusCount, setStatusCount] = useState<AnaliseStatusCount | null>(null);
+  const [analises, setAnalises] = useState<SolicitacaoAnaliseData[]>([]);
+  const [statusCount, setStatusCount] = useState<SolicitacaoStatusCount | null>(null);
   const [commodities, setCommodities] = useState<CommodityOption[]>([]);
-  const [activeTab, setActiveTab] = useState<"todos" | AnaliseStatus>("todos");
+  const [activeTab, setActiveTab] = useState<"todos" | SolicitacaoStatus>("todos");
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -56,7 +57,7 @@ export default function AnalisesPage() {
   const loadAnalises = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchAnalises(page, activeTab);
+      const data = await fetchSolicitacoes(page, activeTab);
       setAnalises(data.results);
       setTotalCount(data.count);
     } finally {
@@ -66,7 +67,7 @@ export default function AnalisesPage() {
 
   const loadStatusCount = useCallback(async () => {
     try {
-      const data = await fetchAnaliseStatusCount();
+      const data = await fetchSolicitacaoStatusCount();
       setStatusCount(data);
     } catch {
       // silencioso
@@ -91,7 +92,7 @@ export default function AnalisesPage() {
       .catch(() => {});
   }, [isAuthenticated]);
 
-  function handleTabChange(tab: "todos" | AnaliseStatus) {
+  function handleTabChange(tab: "todos" | SolicitacaoStatus) {
     setActiveTab(tab);
     setPage(1);
   }
