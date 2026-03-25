@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { RecentAnalysisCard, type RecentAnalysisData } from "@/components/RecentAnalysisCard"
 import { apiFetch } from "@/services/authService"
 import { API_BASE_URL } from "@/config/apiConfig"
+import type { SolicitacaoAnaliseData } from "@/services/analiseService"
 
 // Paleta deterministica baseada no codigo da commodity
 const CHART_PALETTE = [
@@ -21,40 +22,32 @@ function colorForCode(code: string) {
   return CHART_PALETTE[hash % CHART_PALETTE.length]
 }
 
-interface ApiAnalise {
-  id: number
-  commodity_code: string
-  title: string
-  status: "aprovado" | "pendente" | "rejeitado" | "em_analise"
-  sale_price: string
-  sale_price_currency: string
-  sale_price_unit: string
-  contract_type: string
-  expiry_year: number
-  total_contract_value: string
-  country: string
-  time_ago: string
-  commodity_image_url?: string | null
-}
-
-function toRecentAnalysisData(a: ApiAnalise): RecentAnalysisData {
-  const color = colorForCode(a.commodity_code)
+function toRecentAnalysisData(a: SolicitacaoAnaliseData): RecentAnalysisData {
+  const color = colorForCode(a.commodity_codigo)
+  const ticket = a.mes_contrato_ticket ?? (
+    a.mes_contrato_codigo && a.mes_contrato_ano
+      ? `${a.mes_contrato_codigo}/${a.mes_contrato_ano}`
+      : "-"
+  )
   return {
     id: String(a.id),
-    commodityCode: a.commodity_code,
+    commodityCode: a.commodity_codigo,
     commodityColor: color.bg,
     commodityTextColor: color.text,
-    imageUrl: a.commodity_image_url ?? undefined,
-    title: a.title,
-    status: a.status,
-    salePrice: parseFloat(a.sale_price),
-    salePriceCurrency: a.sale_price_currency,
-    salePriceUnit: a.sale_price_unit,
-    contractType: a.contract_type,
-    expiryYear: a.expiry_year,
-    totalContractValue: a.total_contract_value,
-    country: a.country,
-    timeAgo: a.time_ago,
+    imageUrl: a.commodity_imagem_url ?? undefined,
+    title: `${a.commodity_nome} — ${a.tipo_derivativo_rotulo}`,
+    status: a.status === "aguardando" ? "pendente"
+          : a.status === "processando" ? "em_analise"
+          : a.status === "concluido" ? "aprovado"
+          : "rejeitado",
+    salePrice: a.preco_mercado_atual,
+    salePriceCurrency: a.commodity_moeda,
+    salePriceUnit: a.commodity_unidade,
+    contractType: a.tipo_derivativo_rotulo,
+    expiryYear: a.mes_contrato_ano ?? 0,
+    totalContractValue: ticket,
+    country: a.posicao ?? "-",
+    timeAgo: new Date(a.criado_em).toLocaleDateString("pt-BR"),
   }
 }
 
@@ -67,12 +60,12 @@ export function RecentAnalysisCards({ className }: RecentAnalysisCardsProps) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    apiFetch(`${API_BASE_URL}/api/v1/dados/analises/`)
+    apiFetch(`${API_BASE_URL}/api/v1/solicitacao_analise/`)
       .then((res) => {
         if (!res.ok) throw new Error("fetch failed")
-        return res.json() as Promise<ApiAnalise[]>
+        return res.json() as Promise<{ results: SolicitacaoAnaliseData[] }>
       })
-      .then((data) => setAnalises(data.map(toRecentAnalysisData)))
+      .then((data) => setAnalises(data.results.map(toRecentAnalysisData)))
       .catch(() => setAnalises([]))
       .finally(() => setLoading(false))
   }, [])
