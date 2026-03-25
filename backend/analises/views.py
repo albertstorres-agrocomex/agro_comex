@@ -96,7 +96,7 @@ class SolicitacaoAnaliseStatusCountView(APIView):
         perfil = request.user.usuarios
         qs = SolicitacaoAnalise.objects.filter(usuario=perfil)
         counts = qs.aggregate(
-            aguardando=Count("id", filter=Q(status="aguardanto")),
+            aguardando=Count("id", filter=Q(status="aguardando")),
             processando=Count("id", filter=Q(status="processando")),
             concluido=Count("id", filter=Q(status="concluido")),
             erro=Count("id", filter=Q(status="erro")),
