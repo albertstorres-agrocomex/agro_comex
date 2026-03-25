@@ -19,6 +19,14 @@ def processar_analise(analise_id: int) -> None:
         logger.error("Analise %s nao encontrada para processamento.", analise_id)
         return
 
+    if analise.status != "pendente":
+        logger.warning(
+            "Analise %s nao esta pendente (status=%s), processamento abortado.",
+            analise_id,
+            analise.status,
+        )
+        return
+
     analise.status = "em_analise"
     analise.resultado = (
         "Analise em processamento. "
