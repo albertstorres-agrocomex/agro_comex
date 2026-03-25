@@ -1,56 +1,70 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import type { AnaliseData } from "@/services/analiseService";
+import type { SolicitacaoAnaliseData } from "@/services/analiseService";
 
 const STATUS_CONFIG = {
-  aprovado: {
-    label: "Aprovado",
-    style: { background: "var(--success)", color: "var(--success-foreground)" },
-  },
-  pendente: {
-    label: "Pendente",
+  aguardando: {
+    label: "Aguardando",
     style: { background: "var(--warning)", color: "var(--warning-foreground)" },
   },
-  rejeitado: {
-    label: "Rejeitado",
+  processando: {
+    label: "Processando",
+    style: { background: "var(--info)", color: "var(--info-foreground)" },
+  },
+  concluido: {
+    label: "Concluido",
+    style: { background: "var(--success)", color: "var(--success-foreground)" },
+  },
+  erro: {
+    label: "Erro",
     style: {
       background: "var(--destructive)",
       color: "var(--destructive-foreground)",
     },
   },
-  em_analise: {
-    label: "Em Analise",
-    style: { background: "var(--info)", color: "var(--info-foreground)" },
-  },
 };
 
 interface Props {
-  analise: AnaliseData;
+  analise: SolicitacaoAnaliseData;
 }
 
 export function AnaliseCard({ analise }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const cfg = STATUS_CONFIG[analise.status];
 
+  const mesLabel =
+    analise.mes_contrato_ticket ??
+    (analise.mes_contrato_codigo && analise.mes_contrato_ano
+      ? `${analise.mes_contrato_codigo}/${analise.mes_contrato_ano}`
+      : null);
+
+  const title = `${analise.commodity_nome} — ${analise.tipo_derivativo_rotulo}${mesLabel ? ` (${mesLabel})` : ""}`;
+
+  const dataFormatada = new Date(analise.criado_em).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
   return (
     <div className="border-b border-border last:border-b-0 px-1 py-3">
       <div className="flex items-start gap-3">
         {/* Imagem / placeholder */}
         <div className="shrink-0">
-          {analise.commodity_image_url ? (
+          {analise.commodity_imagem_url ? (
             <img
-              src={analise.commodity_image_url}
-              alt={analise.commodity_code}
+              src={analise.commodity_imagem_url}
+              alt={analise.commodity_nome}
               className="w-10 h-10 rounded-[var(--radius-md)] object-cover"
             />
           ) : (
             <div className="w-10 h-10 rounded-[var(--radius-md)] bg-muted flex items-center justify-center">
               <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                {analise.commodity_code.slice(0, 3)}
+                {analise.commodity_codigo.slice(0, 3)}
               </span>
             </div>
           )}
@@ -64,7 +78,7 @@ export function AnaliseCard({ analise }: Props) {
                 href={`/analises/${analise.id}`}
                 className="text-sm font-bold text-foreground leading-tight truncate block hover:underline"
               >
-                {analise.title}
+                {title}
               </Link>
               <Badge
                 variant="secondary"
@@ -74,12 +88,12 @@ export function AnaliseCard({ analise }: Props) {
                 {cfg.label}
               </Badge>
               <p className="text-sm font-semibold text-foreground mt-1.5 tabular-nums">
-                {analise.sale_price_currency}{" "}
-                {Number(analise.sale_price).toLocaleString("pt-BR", {
+                {analise.commodity_moeda}{" "}
+                {Number(analise.preco_mercado_atual).toLocaleString("pt-BR", {
                   minimumFractionDigits: 2,
                 })}
                 <span className="text-[11px] font-normal text-muted-foreground ml-1">
-                  {analise.sale_price_unit}
+                  {analise.commodity_unidade}
                 </span>
               </p>
             </div>
@@ -105,28 +119,33 @@ export function AnaliseCard({ analise }: Props) {
                   variant="secondary"
                   className="text-[9px] px-1.5 py-0 h-[18px]"
                 >
-                  {analise.contract_type}
+                  {analise.tipo_derivativo_rotulo}
                 </Badge>
-                <Badge
-                  variant="secondary"
-                  className="text-[9px] px-1.5 py-0 h-[18px]"
-                >
-                  {analise.expiry_year}
-                </Badge>
+                {mesLabel && (
+                  <Badge
+                    variant="secondary"
+                    className="text-[9px] px-1.5 py-0 h-[18px]"
+                  >
+                    {mesLabel}
+                  </Badge>
+                )}
+                {analise.posicao && (
+                  <Badge
+                    variant="secondary"
+                    className="text-[9px] px-1.5 py-0 h-[18px]"
+                  >
+                    {analise.posicao === "comprador" ? "Comprador" : "Vendedor"}
+                  </Badge>
+                )}
               </div>
-              {analise.quantidade_toneladas && (
+              {analise.nivel_barreira !== null && analise.nivel_barreira !== undefined && (
                 <p className="text-xs text-muted-foreground leading-snug">
-                  {Number(analise.quantidade_toneladas).toLocaleString("pt-BR")}{" "}
-                  t &middot; Total: {analise.total_contract_value}
+                  Barreira: {analise.nivel_barreira}
                 </p>
               )}
               <div className="flex items-center gap-[10px] mt-1">
-                <MapPin size={11} className="text-muted-foreground shrink-0" />
-                <span className="text-xs text-muted-foreground">
-                  {analise.country}
-                </span>
                 <span className="text-xs text-muted-foreground ml-auto">
-                  {analise.time_ago}
+                  {dataFormatada}
                 </span>
               </div>
             </div>
