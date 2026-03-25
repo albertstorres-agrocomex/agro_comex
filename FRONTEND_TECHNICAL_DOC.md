@@ -58,6 +58,10 @@ frontend/src/
       page.tsx               # Dashboard — verifica sessao; redireciona para /dashboard/commodities se usuario sem selecao
       commodities/
         page.tsx             # Selecao de commodities — grid de cards com toggle, busca server-side, paginacao, salvar selecao
+    analises/
+      page.tsx               # Lista paginada de analises — tabs por status, grafico donut, botao Nova Analise
+      [id]/
+        page.tsx             # Detalhe de analise — exibe campos e resultado; acoes aprovar/reprovar (so para em_analise)
     login/
       page.tsx               # Redirect para `/`
     styleguide/
@@ -74,9 +78,14 @@ frontend/src/
     LineChartComex.tsx       # Componente de grafico de linha
     PieChartComex.tsx        # Componente de grafico de pizza/donut
     WorldMapComex.tsx        # Componente de mapa mundial coropletico
+    RecentAnalysisCards.tsx  # Cards de analises recentes — link "Veja tudo" aponta para /analises
     system/
       auth/
         LoginCard.tsx        # Card de login — prop error?: string (role="alert", text-destructive)
+      analise/
+        AnaliseCard.tsx           # Card expansivel com badge de status e link para /analises/[id]
+        AnaliseStatusPieChart.tsx # Grafico donut com distribuicao dos 4 status (usa PieChartComex)
+        NovaAnaliseModal.tsx      # Modal com formulario para criar nova analise
     ui/                      # Componentes shadcn/ui tematizados
       card.tsx
       button.tsx
@@ -89,6 +98,7 @@ frontend/src/
     AuthContext.tsx          # React Context de autenticacao global — expoe useAuth()
   services/
     authService.ts           # Servico HTTP de auth: login(), refreshToken(), logout()
+    analiseService.ts        # Servico HTTP de analises: 6 funcoes, 5 tipos TypeScript
   lib/
     utils.ts                 # cn() — merge de classes Tailwind
   types/
@@ -104,6 +114,8 @@ frontend/src/
 | `/` | Login |
 | `/login` | Redirect permanente para `/` |
 | `/dashboard` | Dashboard principal — requer autenticacao |
+| `/analises` | Lista paginada de analises — requer autenticacao |
+| `/analises/[id]` | Detalhe de analise — acoes de aprovacao/reprovacao |
 | `/styleguide` | Design tokens — cores, tipografia, radii |
 | `/styleguide/components/bar-chart` | Showcase do BarChartComex |
 | `/styleguide/components/line-chart` | Showcase do LineChartComex |
@@ -411,6 +423,97 @@ interface AuthContextValue {
 | Variavel | Valor padrao | Onde definir |
 |----------|-------------|--------------|
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | `frontend/.env.local` (nao commitado) |
+
+---
+
+## Modulo de Analises
+
+### analiseService.ts
+
+**Arquivo:** `src/services/analiseService.ts`
+
+Servico HTTP para o recurso `Analise`. Todas as funcoes usam a instancia axios autenticada de `frontend/services/api.ts`.
+
+**Tipos exportados:**
+
+```typescript
+type AnaliseStatus = "pendente" | "em_analise" | "aprovado" | "rejeitado"
+
+interface Analise {
+  id: number
+  commodity: number
+  commodity_nome: string
+  status: AnaliseStatus
+  resultado: string
+  quantidade_toneladas: string | null
+  criado_em: string
+  atualizado_em: string
+}
+
+interface AnalisePaginada {
+  count: number
+  next: string | null
+  previous: string | null
+  results: Analise[]
+}
+
+interface AnaliseStatusCount {
+  pendente: number
+  em_analise: number
+  aprovado: number
+  rejeitado: number
+  total: number
+}
+
+interface NovaAnalisePayload {
+  commodity: number
+  quantidade_toneladas?: string
+}
+```
+
+**Funcoes exportadas:**
+
+| Funcao | Metodo | URL | Descricao |
+|--------|--------|-----|-----------|
+| `listarAnalises(page, status)` | GET | `/api/v1/dados/analises/` | Lista paginada (6/pag); `status` opcional filtra por estado |
+| `criarAnalise(payload)` | POST | `/api/v1/dados/analises/create/` | Cria analise e enfileira tarefa Celery |
+| `getAnalise(id)` | GET | `/api/v1/dados/analises/<id>/` | Detalhe de uma analise |
+| `getStatusCount()` | GET | `/api/v1/dados/analises/status-count/` | Contagem por status + total |
+| `aprovarAnalise(id)` | PATCH | `/api/v1/dados/analises/<id>/aprovar/` | Aprova (exige status em_analise) |
+| `reprovarAnalise(id)` | PATCH | `/api/v1/dados/analises/<id>/reprovar/` | Reprova (exige status em_analise) |
+
+---
+
+### AnaliseCard
+
+**Arquivo:** `src/components/system/analise/AnaliseCard.tsx`
+
+Card expansivel que exibe resumo de uma analise. Ao expandir mostra `resultado` e `quantidade_toneladas`. Badge de status segue o mapeamento:
+
+| Status | Variante do Badge |
+|--------|------------------|
+| `pendente` | warning |
+| `em_analise` | info |
+| `aprovado` | success |
+| `rejeitado` | destructive |
+
+Link para `/analises/[id]` no rodape do card expandido.
+
+---
+
+### AnaliseStatusPieChart
+
+**Arquivo:** `src/components/system/analise/AnaliseStatusPieChart.tsx`
+
+Grafico donut com 4 fatias (pendente, em_analise, aprovado, rejeitado) usando `PieChartComex`. Recebe `AnaliseStatusCount` como prop e exibe o total no centro.
+
+---
+
+### NovaAnaliseModal
+
+**Arquivo:** `src/components/system/analise/NovaAnaliseModal.tsx`
+
+Modal acionado pelo botao "Nova Analise" na pagina `/analises`. Formulario com select de commodity (busca via `commodityService`) e campo opcional de quantidade em toneladas. Apos submit bem-sucedido fecha o modal e dispara refresh da lista.
 
 ---
 

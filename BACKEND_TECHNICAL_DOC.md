@@ -50,6 +50,20 @@ Submodulos internos do app `dados`:
 | Pipeline de normalizacao | `dados/limpeza/agrobr.py` | Converte DataFrames B3/CEPEA para lista de dicts padronizados |
 | Pipeline de normalizacao | `dados/limpeza/bcb.py` | Converte series BCB para lista de dicts padronizados |
 
+### `dados` — Model Analise
+
+O model `Analise` (app `dados`, migration `0006_add_analise` e `0007_analise_add_fields`) representa uma solicitacao de analise iniciada pelo usuario. Campos relevantes alem dos basicos:
+
+| Campo | Tipo | Descricao |
+|-------|------|-----------|
+| `commodity` | ForeignKey | Commodity associada |
+| `usuario` | ForeignKey | Usuario que criou (isolamento por usuario nas views) |
+| `status` | CharField | `pendente` / `em_analise` / `aprovado` / `rejeitado` |
+| `resultado` | TextField | Texto de resultado preenchido pelo worker (default `""`) |
+| `quantidade_toneladas` | DecimalField(12,4) | Volume opcional informado pelo usuario; nullable |
+
+---
+
 ### `analises`
 Nucleo do sistema. Gerencia o ciclo completo de precificacao:
 - `SolicitacaoAnalise`: recebe os parametros do usuario e enfileira a tarefa no Celery via `perform_create()` no ViewSet
@@ -113,6 +127,34 @@ Todos os endpoints seguem o padrao REST gerado pelo `DefaultRouter` do DRF. O pr
 | GET/PUT/PATCH/DELETE | `/api/v1/solicitacao_analise/{id}/` | Detalhe / atualiza / remove |
 | GET/POST | `/api/v1/resultado_analise/` | Lista / cria resultados de analise |
 | GET/PUT/PATCH/DELETE | `/api/v1/resultado_analise/{id}/` | Detalhe / atualiza / remove |
+
+### Endpoints de Analise (app `dados`)
+
+Todos requerem autenticacao Bearer. As views operam exclusivamente sobre registros do `request.user` (isolamento por usuario).
+
+| Metodo | URL | Descricao |
+|--------|-----|-----------|
+| GET | `/api/v1/dados/analises/` | Lista paginada (6/pag). Filtro opcional: `?status=pendente\|em_analise\|aprovado\|rejeitado\|todos` |
+| POST | `/api/v1/dados/analises/create/` | Cria analise. Retorna `AnaliseDetailSerializer`. Enfileira `processar_analise` no Celery. |
+| GET | `/api/v1/dados/analises/status-count/` | Retorna contagens por status + total (`AnaliseStatusCountSerializer`) |
+| GET | `/api/v1/dados/analises/<id>/` | Detalhe de uma analise (somente do usuario autenticado) |
+| PATCH | `/api/v1/dados/analises/<id>/aprovar/` | Aprova a analise. Exige `status=em_analise`; retorna HTTP 409 se estado invalido. |
+| PATCH | `/api/v1/dados/analises/<id>/reprovar/` | Reprova a analise. Mesmas regras de estado que `/aprovar/`. |
+
+**Serializers novos:**
+
+| Serializer | Uso |
+|------------|-----|
+| `AnaliseCreateSerializer` | Entrada de `POST /create/`. Valida `commodity` e `quantidade_toneladas`. |
+| `AnaliseDetailSerializer` | Saida de detalhe e criacao. Inclui `commodity_nome` via `_AnaliseComputedFieldsMixin`. |
+| `AnaliseStatusCountSerializer` | Saida de `/status-count/`. Campos: `pendente`, `em_analise`, `aprovado`, `rejeitado`, `total`. |
+| `_AnaliseComputedFieldsMixin` | Mixin interno que adiciona `commodity_nome` (campo computado read-only). |
+
+**Tarefa Celery:**
+
+| Tarefa | Caminho | Descricao |
+|--------|---------|-----------|
+| `processar_analise` | `dados.tasks.processar_analise` | Recebe `analise_id`. Guarda contra status diferente de `pendente` (idempotencia). Transiciona para `em_analise` e preenche `resultado` com placeholder. |
 
 ### Estrutura de URLs por app
 
