@@ -1,24 +1,24 @@
 import { PieChartComex, type PieChartDataItem } from "@/components/PieChartComex";
 import type { ChartConfig } from "@/components/ui/chart";
-import type { AnaliseStatusCount } from "@/services/analiseService";
+import type { SolicitacaoStatusCount } from "@/services/analiseService";
 
 interface Props {
-  counts: AnaliseStatusCount;
+  counts: SolicitacaoStatusCount;
 }
 
 const config: ChartConfig = {
-  pendente: { label: "Pendente", color: "var(--chart-3)" },
-  em_analise: { label: "Em Analise", color: "var(--chart-4)" },
-  aprovado: { label: "Aprovado", color: "var(--success)" },
-  rejeitado: { label: "Rejeitado", color: "var(--destructive)" },
+  aguardando: { label: "Aguardando", color: "var(--chart-3)" },
+  processando: { label: "Processando", color: "var(--chart-4)" },
+  concluido: { label: "Concluido", color: "var(--success)" },
+  erro: { label: "Erro", color: "var(--destructive)" },
 };
 
 export function AnaliseStatusPieChart({ counts }: Props) {
   const data: PieChartDataItem[] = [
-    { label: "Pendente", value: counts.pendente, colorKey: "pendente" },
-    { label: "Em Analise", value: counts.em_analise, colorKey: "em_analise" },
-    { label: "Aprovado", value: counts.aprovado, colorKey: "aprovado" },
-    { label: "Rejeitado", value: counts.rejeitado, colorKey: "rejeitado" },
+    { label: "Aguardando", value: counts.aguardando, colorKey: "aguardando" },
+    { label: "Processando", value: counts.processando, colorKey: "processando" },
+    { label: "Concluido", value: counts.concluido, colorKey: "concluido" },
+    { label: "Erro", value: counts.erro, colorKey: "erro" },
   ].filter((d) => d.value > 0);
 
   if (data.length === 0) {

@@ -15,9 +15,35 @@ class UserCommoditiesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from dados.models import CacheDadosMercado
+        from django.db.models import Subquery, OuterRef
+
         perfil = request.user.usuarios
-        ids = list(perfil.commodities.values_list('id', flat=True))
-        return Response({'commodity_ids': ids})
+        commodities = perfil.commodities.filter(ativo=True)
+
+        ultimo_preco = (
+            CacheDadosMercado.objects
+            .filter(commodity=OuterRef("pk"))
+            .order_by("-data_preco")
+            .values("preco_fechamento")[:1]
+        )
+
+        commodities = commodities.annotate(
+            preco_atual_raw=Subquery(ultimo_preco)
+        )
+
+        result = [
+            {
+                "id": c.id,
+                "codigo": c.codigo,
+                "nome": c.nome,
+                "moeda": c.moeda,
+                "unidade": c.unidade,
+                "preco_atual": str(c.preco_atual_raw) if c.preco_atual_raw is not None else None,
+            }
+            for c in commodities
+        ]
+        return Response({"commodities": result})
 
     def put(self, request):
         ids = request.data.get('commodity_ids', [])

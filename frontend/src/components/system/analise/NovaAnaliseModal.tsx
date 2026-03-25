@@ -17,12 +17,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createAnalise, type AnaliseCreatePayload } from "@/services/analiseService";
+import {
+  createSolicitacao,
+  fetchTiposDerivativo,
+  fetchMesesContrato,
+  type TipoDerivativo,
+  type MesContrato,
+} from "@/services/analiseService";
 
 interface CommodityOption {
+  id: number;
   codigo: string;
   nome: string;
-  preco_atual?: string;
+  preco_atual?: string | null;
   moeda: string;
   unidade: string;
 }
@@ -34,72 +41,91 @@ interface Props {
   commodities: CommodityOption[];
 }
 
-const CONTRACT_TYPES = ["Futuro", "Opcao de Compra", "Opcao de Venda", "Swap"];
-
-const CURRENT_YEAR = new Date().getFullYear();
-const EXPIRY_YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR + i);
-
-const COUNTRIES = [
-  "Brasil",
-  "Estados Unidos",
-  "Argentina",
-  "China",
-  "Europa",
-  "Outros",
-];
-
 export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Props) {
-  const [selectedCommodity, setSelectedCommodity] = useState("");
-  const [contractType, setContractType] = useState("");
-  const [expiryYear, setExpiryYear] = useState(String(CURRENT_YEAR));
-  const [quantity, setQuantity] = useState("");
-  const [country, setCountry] = useState("");
+  const [commodityId, setCommodityId] = useState<string>("");
+  const [tipoId, setTipoId] = useState<string>("");
+  const [mesId, setMesId] = useState<string>("");
+  const [posicao, setPosicao] = useState<"comprador" | "vendedor" | "">("");
+  const [nivelBarreira, setNivelBarreira] = useState<string>("");
+
+  const [tipos, setTipos] = useState<TipoDerivativo[]>([]);
+  const [meses, setMeses] = useState<MesContrato[]>([]);
+  const [loadingTipos, setLoadingTipos] = useState(false);
+  const [loadingMeses, setLoadingMeses] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const commodity = commodities.find((c) => c.codigo === selectedCommodity);
-  const salePrice = commodity?.preco_atual ?? "0";
-  const totalValue = commodity && quantity
-    ? (Number(salePrice) * Number(quantity)).toFixed(2)
-    : "";
+  const commodity = commodities.find((c) => String(c.id) === commodityId);
+  const tipo = tipos.find((t) => String(t.id) === tipoId);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoadingTipos(true);
+    fetchTiposDerivativo()
+      .then(setTipos)
+      .catch(() => {})
+      .finally(() => setLoadingTipos(false));
+  }, [open]);
+
+  useEffect(() => {
+    if (!commodityId) {
+      setMeses([]);
+      setMesId("");
+      return;
+    }
+    setLoadingMeses(true);
+    fetchMesesContrato(Number(commodityId))
+      .then(setMeses)
+      .catch(() => {})
+      .finally(() => setLoadingMeses(false));
+  }, [commodityId]);
 
   useEffect(() => {
     if (!open) {
-      setSelectedCommodity("");
-      setContractType("");
-      setExpiryYear(String(CURRENT_YEAR));
-      setQuantity("");
-      setCountry("");
+      setCommodityId("");
+      setTipoId("");
+      setMesId("");
+      setPosicao("");
+      setNivelBarreira("");
+      setMeses([]);
       setError("");
     }
   }, [open]);
 
+  useEffect(() => {
+    setPosicao("");
+    setNivelBarreira("");
+  }, [tipoId]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedCommodity || !contractType || !quantity || !country) {
-      setError("Preencha todos os campos obrigatorios.");
+    if (!commodityId || !tipoId) {
+      setError("Selecione a commodity e o tipo de derivativo.");
       return;
     }
+    if (tipo?.requer_posicao && !tipo?.posicao_implicita && !posicao) {
+      setError("Selecione a posicao (comprador ou vendedor).");
+      return;
+    }
+    if (tipo?.requer_barreira && !nivelBarreira) {
+      setError("Informe o nivel de barreira.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
-      const payload: AnaliseCreatePayload = {
-        commodity_code: selectedCommodity,
-        title: `Analise ${commodity?.nome ?? selectedCommodity} - ${contractType} ${expiryYear}`,
-        sale_price: salePrice,
-        sale_price_currency: commodity?.moeda ?? "USD",
-        sale_price_unit: `/${commodity?.unidade ?? "ton"}`,
-        contract_type: contractType,
-        expiry_year: Number(expiryYear),
-        total_contract_value: `${commodity?.moeda ?? "USD"} ${Number(totalValue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-        quantidade_toneladas: quantity,
-        country,
-      };
-      await createAnalise(payload);
+      await createSolicitacao({
+        commodity: Number(commodityId),
+        tipo_derivativo: Number(tipoId),
+        mes_contrato: mesId ? Number(mesId) : null,
+        posicao: posicao || null,
+        nivel_barreira: nivelBarreira ? Number(nivelBarreira) : null,
+      });
       onCreated();
       onClose();
     } catch {
-      setError("Erro ao criar analise. Tente novamente.");
+      setError("Erro ao criar solicitacao. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -109,52 +135,22 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-base font-bold">Nova Analise</DialogTitle>
+          <DialogTitle className="text-base font-bold">Nova Solicitacao de Analise</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           {/* Commodity */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Commodity</Label>
-            <Select value={selectedCommodity} onValueChange={setSelectedCommodity}>
+            <Select value={commodityId} onValueChange={setCommodityId}>
               <SelectTrigger className="h-9 text-sm">
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent>
                 {commodities.map((c) => (
-                  <SelectItem key={c.codigo} value={c.codigo}>
+                  <SelectItem key={c.id} value={String(c.id)}>
                     {c.nome} ({c.codigo})
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Tipo de contrato */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Tipo de Contrato</Label>
-            <Select value={contractType} onValueChange={setContractType}>
-              <SelectTrigger className="h-9 text-sm">
-                <SelectValue placeholder="Selecione..." />
-              </SelectTrigger>
-              <SelectContent>
-                {CONTRACT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Ano de vencimento */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Ano de Vencimento</Label>
-            <Select value={expiryYear} onValueChange={setExpiryYear}>
-              <SelectTrigger className="h-9 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {EXPIRY_YEARS.map((y) => (
-                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -165,53 +161,103 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Preco Atual</Label>
               <Input
-                value={`${commodity.moeda} ${Number(salePrice).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} /${commodity.unidade}`}
+                value={
+                  commodity.preco_atual
+                    ? `${commodity.moeda} ${Number(commodity.preco_atual).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} /${commodity.unidade}`
+                    : "Sem preco disponivel"
+                }
                 readOnly
                 className="h-9 text-sm bg-muted cursor-default"
               />
             </div>
           )}
 
-          {/* Quantidade em toneladas */}
+          {/* Tipo de derivativo */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Quantidade (toneladas)</Label>
-            <Input
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              placeholder="Ex: 500"
-              className="h-9 text-sm"
-            />
-          </div>
-
-          {/* Valor total calculado (readonly) */}
-          {totalValue && (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Valor Total do Contrato</Label>
-              <Input
-                value={`${commodity?.moeda ?? "USD"} ${Number(totalValue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
-                readOnly
-                className="h-9 text-sm bg-muted cursor-default"
-              />
-            </div>
-          )}
-
-          {/* Pais */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Pais de Referencia</Label>
-            <Select value={country} onValueChange={setCountry}>
+            <Label className="text-xs font-semibold">Tipo de Derivativo</Label>
+            <Select value={tipoId} onValueChange={setTipoId} disabled={loadingTipos}>
               <SelectTrigger className="h-9 text-sm">
-                <SelectValue placeholder="Selecione..." />
+                <SelectValue placeholder={loadingTipos ? "Carregando..." : "Selecione..."} />
               </SelectTrigger>
               <SelectContent>
-                {COUNTRIES.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                {tipos.map((t) => (
+                  <SelectItem key={t.id} value={String(t.id)}>
+                    {t.nome}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {/* Mes do contrato */}
+          {commodityId && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">
+                Mes do Contrato
+                <span className="ml-1 text-muted-foreground font-normal">(opcional)</span>
+              </Label>
+              <Select
+                value={mesId}
+                onValueChange={setMesId}
+                disabled={loadingMeses || meses.length === 0}
+              >
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue
+                    placeholder={
+                      loadingMeses
+                        ? "Carregando..."
+                        : meses.length === 0
+                        ? "Nenhum mes disponivel"
+                        : "Selecione..."
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {meses.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.ticket_completo ?? `${m.codigo_mes}${m.ano}`} — venc.{" "}
+                      {new Date(m.data_vencimento).toLocaleDateString("pt-BR")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Posicao — apenas quando requerida E nao implicita no tipo */}
+          {tipo?.requer_posicao && !tipo?.posicao_implicita && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Posicao</Label>
+              <Select
+                value={posicao}
+                onValueChange={(v) => setPosicao(v as "comprador" | "vendedor")}
+              >
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="comprador">Comprador</SelectItem>
+                  <SelectItem value="vendedor">Vendedor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Nivel de barreira — condicional */}
+          {tipo?.requer_barreira && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Nivel de Barreira</Label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={nivelBarreira}
+                onChange={(e) => setNivelBarreira(e.target.value)}
+                placeholder="Ex: 450"
+                className="h-9 text-sm"
+              />
+            </div>
+          )}
 
           {error && <p className="text-xs text-destructive">{error}</p>}
 

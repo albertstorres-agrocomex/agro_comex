@@ -6,7 +6,7 @@ from meses_contrato_futuro.models import MesContratoFurturo
 
 class SolicitacaoAnalise(models.Model):
     class Status(models.TextChoices):
-        AGUARDANTO = "aguardanto"
+        AGUARDANDO = "aguardando"
         PROCESSANDO = "processando"
         CONCLUIDO = "concluido"
         ERRO = "erro"
@@ -35,7 +35,7 @@ class SolicitacaoAnalise(models.Model):
     preco_mercado_atual = models.IntegerField()
     posicao = models.CharField(max_length=12, null=True, blank=True)
     nivel_barreira = models.IntegerField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.AGUARDANTO)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.AGUARDANDO)
     id_tarefa_worker = models.CharField(max_length=100, null=True, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 

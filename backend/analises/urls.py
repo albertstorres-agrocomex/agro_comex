@@ -1,8 +1,12 @@
-from rest_framework.routers import DefaultRouter
-from analises.views import SolicitacaoAnaliseViewSet, ResultadoAnaliseViewSet
+from django.urls import path
+from analises.views import (
+    SolicitacaoAnaliseListCreateView,
+    SolicitacaoAnaliseDetailView,
+    SolicitacaoAnaliseStatusCountView,
+)
 
-router = DefaultRouter()
-router.register("solicitacao_analise", SolicitacaoAnaliseViewSet)
-router.register("resultado_analise", ResultadoAnaliseViewSet)
-
-urlpatterns = router.urls
+urlpatterns = [
+    path("solicitacao_analise/", SolicitacaoAnaliseListCreateView.as_view(), name="solicitacao_analise_list_create"),
+    path("solicitacao_analise/status-count/", SolicitacaoAnaliseStatusCountView.as_view(), name="solicitacao_analise_status_count"),
+    path("solicitacao_analise/<int:pk>/", SolicitacaoAnaliseDetailView.as_view(), name="solicitacao_analise_detail"),
+]
