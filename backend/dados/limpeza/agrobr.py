@@ -27,9 +27,7 @@ def _to_date(valor) -> date:
     return date.fromisoformat(str(valor))
 
 
-def normalizar_futuros_b3(
-    df: pd.DataFrame, contrato: str, fonte: str
-) -> list[dict]:
+def normalizar_futuros_b3(df: pd.DataFrame, contrato: str, fonte: str) -> list[dict]:
     """
     Normaliza DataFrame de ajustes diarios da B3 (agrobr.b3.historico).
 
@@ -74,9 +72,7 @@ def normalizar_futuros_b3(
     return registros
 
 
-def normalizar_precos_cepea(
-    df: pd.DataFrame, commodity: str, fonte: str
-) -> list[dict]:
+def normalizar_precos_cepea(df: pd.DataFrame, commodity: str, fonte: str) -> list[dict]:
     """
     Normaliza DataFrame de precos spot do CEPEA (agrobr.datasets.preco_diario).
 
@@ -122,9 +118,7 @@ def normalizar_precos_cepea(
     return registros
 
 
-def normalizar_estimativa_safra(
-    df: pd.DataFrame, cultura: str, fonte: str
-) -> list[dict]:
+def normalizar_estimativa_safra(df: pd.DataFrame, cultura: str, fonte: str) -> list[dict]:
     """
     Normaliza DataFrame de estimativa de safra (agrobr.datasets.estimativa_safra).
 
@@ -139,9 +133,7 @@ def normalizar_estimativa_safra(
     return []
 
 
-def normalizar_exportacao(
-    df: pd.DataFrame, cultura: str, fonte: str
-) -> list[dict]:
+def normalizar_exportacao(df: pd.DataFrame, cultura: str, fonte: str) -> list[dict]:
     """
     Normaliza DataFrame de exportacao agricola (agrobr.datasets.exportacao / ComexStat).
 
