@@ -10,7 +10,35 @@ class CacheDadosMercadoSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class AnaliseSerializer(serializers.ModelSerializer):
+class _AnaliseComputedFieldsMixin:
+    """Campos calculados compartilhados entre AnaliseSerializer e AnaliseDetailSerializer.
+
+    Nota: get_commodity_image_url executa uma query por objeto. Em listagens grandes
+    isso gera N+1 queries. A view deve usar anotacao no queryset se performance for critica.
+    """
+
+    def get_time_ago(self, obj) -> str:
+        seconds = int((timezone.now() - obj.created_at).total_seconds())
+        if seconds < 60:
+            return "agora"
+        if seconds < 3600:
+            m = seconds // 60
+            return f"{m}min atras"
+        if seconds < 86400:
+            h = seconds // 3600
+            return f"{h}h atras"
+        d = seconds // 86400
+        return f"{d}d atras"
+
+    def get_commodity_image_url(self, obj) -> str | None:
+        try:
+            commodity = Comomodity.objects.get(codigo=obj.commodity_code)
+            return commodity.imagem_url or None
+        except Comomodity.DoesNotExist:
+            return None
+
+
+class AnaliseSerializer(_AnaliseComputedFieldsMixin, serializers.ModelSerializer):
     time_ago = serializers.SerializerMethodField()
     commodity_image_url = serializers.SerializerMethodField()
 
@@ -23,26 +51,6 @@ class AnaliseSerializer(serializers.ModelSerializer):
             "quantidade_toneladas", "country", "resultado",
             "time_ago", "commodity_image_url",
         ]
-
-    def get_commodity_image_url(self, obj) -> str | None:
-        try:
-            commodity = Comomodity.objects.get(codigo=obj.commodity_code)
-            return commodity.imagem_url or None
-        except Comomodity.DoesNotExist:
-            return None
-
-    def get_time_ago(self, obj) -> str:
-        seconds = int((timezone.now() - obj.created_at).total_seconds())
-        if seconds < 60:
-            return "agora"
-        if seconds < 3600:
-            m = seconds // 60
-            return f"{m}min ago"
-        if seconds < 86400:
-            h = seconds // 3600
-            return f"{h}h ago"
-        d = seconds // 86400
-        return f"{d}d ago"
 
 
 class AnaliseCreateSerializer(serializers.ModelSerializer):
@@ -66,7 +74,7 @@ class AnaliseCreateSerializer(serializers.ModelSerializer):
         return Analise.objects.create(user=user, status="pendente", **validated_data)
 
 
-class AnaliseDetailSerializer(serializers.ModelSerializer):
+class AnaliseDetailSerializer(_AnaliseComputedFieldsMixin, serializers.ModelSerializer):
     time_ago = serializers.SerializerMethodField()
     commodity_image_url = serializers.SerializerMethodField()
 
@@ -91,30 +99,10 @@ class AnaliseDetailSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
-    def get_time_ago(self, obj) -> str:
-        seconds = int((timezone.now() - obj.created_at).total_seconds())
-        if seconds < 60:
-            return "agora"
-        if seconds < 3600:
-            m = seconds // 60
-            return f"{m}min ago"
-        if seconds < 86400:
-            h = seconds // 3600
-            return f"{h}h ago"
-        d = seconds // 86400
-        return f"{d}d ago"
-
-    def get_commodity_image_url(self, obj) -> str | None:
-        try:
-            commodity = Comomodity.objects.get(codigo=obj.commodity_code)
-            return commodity.imagem_url or None
-        except Comomodity.DoesNotExist:
-            return None
-
 
 class AnaliseStatusCountSerializer(serializers.Serializer):
-    pendente = serializers.IntegerField()
-    em_analise = serializers.IntegerField()
-    aprovado = serializers.IntegerField()
-    rejeitado = serializers.IntegerField()
-    total = serializers.IntegerField()
+    pendente   = serializers.IntegerField(read_only=True)
+    em_analise = serializers.IntegerField(read_only=True)
+    aprovado   = serializers.IntegerField(read_only=True)
+    rejeitado  = serializers.IntegerField(read_only=True)
+    total      = serializers.IntegerField(read_only=True)
