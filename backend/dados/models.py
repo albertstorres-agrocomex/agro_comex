@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from commodities.models import Comomodity
 
@@ -9,7 +10,7 @@ class CacheDadosMercado(models.Model):
         on_delete=models.PROTECT
     )
     data_preco = models.DateField()
-    preco_fechamento = models.IntegerField()
+    preco_fechamento = models.BigIntegerField()
     fonte = models.CharField(max_length=50, null=True, blank=True)
     obtido_em = models.DateTimeField(auto_now_add=True)
 
@@ -47,3 +48,37 @@ class DadosMacroeconomicos(models.Model):
         db_table       = "dados_macroeconomicos"
         unique_together = ("indicador", "data")
         indexes         = [models.Index(fields=["indicador", "data"])]
+
+
+class Analise(models.Model):
+    STATUS_CHOICES = [
+        ("aprovado",   "Aprovado"),
+        ("pendente",   "Pendente"),
+        ("rejeitado",  "Rejeitado"),
+        ("em_analise", "Em Analise"),
+    ]
+
+    user                 = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="analises",
+    )
+    commodity_code       = models.CharField(max_length=10)
+    title                = models.CharField(max_length=255)
+    status               = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pendente")
+    sale_price           = models.DecimalField(max_digits=18, decimal_places=2)
+    sale_price_currency  = models.CharField(max_length=10, default="USD")
+    sale_price_unit      = models.CharField(max_length=20, default="/ton")
+    contract_type        = models.CharField(max_length=20)
+    expiry_year          = models.IntegerField()
+    total_contract_value = models.CharField(max_length=100)
+    country              = models.CharField(max_length=100)
+    quantidade_toneladas = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True
+    )
+    resultado            = models.TextField(blank=True, default="")
+    created_at           = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "analise"
+        ordering = ["-created_at"]
