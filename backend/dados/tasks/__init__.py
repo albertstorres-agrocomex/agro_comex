@@ -6,6 +6,8 @@ from .agrobr import (
     atualizar_exportacao,
     atualizar_precos_prohort,
 )
+from .indice_exportacao import calcular_indice_exportacao
+from .processar_analise import processar_analise
 
 __all__ = [
     "atualizar_cambio",
@@ -15,4 +17,6 @@ __all__ = [
     "atualizar_estimativa_safra",
     "atualizar_exportacao",
     "atualizar_precos_prohort",
+    "calcular_indice_exportacao",
+    "processar_analise",
 ]
