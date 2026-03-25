@@ -55,7 +55,9 @@ frontend/src/
     page.tsx                 # Pagina de login (rota raiz `/`) — "use client", usa useAuth()
     providers.tsx            # "use client" wrapper para AuthProvider (necessario pois layout.tsx e Server Component)
     dashboard/
-      page.tsx               # Dashboard placeholder — verifica sessao, exibe nome/grupo, botao logout
+      page.tsx               # Dashboard — verifica sessao; redireciona para /dashboard/commodities se usuario sem selecao
+      commodities/
+        page.tsx             # Selecao de commodities — grid de cards com toggle, busca server-side, paginacao, salvar selecao
     login/
       page.tsx               # Redirect para `/`
     styleguide/
@@ -390,9 +392,9 @@ interface AuthContextValue {
 
 | Etapa | Acao |
 |-------|------|
-| Login | `POST /api/auth/token/` — access token salvo em `authStore` (memoria); refresh token chega como cookie HttpOnly |
-| Silent refresh | `AuthProvider` chama `POST /api/auth/token/refresh/` no mount para restaurar sessao sem exigir novo login |
-| Logout | `POST /api/auth/logout/` (best-effort) — limpa `authStore` e estado do contexto |
+| Login | `POST /api/v1/authentication/token/` — access token salvo em `authStore` (memoria); refresh token chega como cookie HttpOnly |
+| Silent refresh | `AuthProvider` chama `POST /api/v1/authentication/token/refresh/` no mount para restaurar sessao sem exigir novo login |
+| Logout | `POST /api/v1/authentication/logout/` (best-effort) — limpa `authStore` e estado do contexto |
 | Pos-login | Redireciona para `/dashboard` |
 | Dashboard sem sessao | Se `!isAuthenticated` apos o carregamento, redireciona para `/` |
 

@@ -1,13 +1,15 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
-import { Button } from "@/components/ui/button"
+import { TopMenu } from "@/components/system/layout/TopMenu"
+import { API_BASE_URL } from "@/config/apiConfig"
 
 export default function DashboardPage() {
   const { user, isAuthenticated, isLoading, logout } = useAuth()
   const router = useRouter()
+  const [userCommodities, setUserCommodities] = useState<number[] | null>(null)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -15,12 +17,28 @@ export default function DashboardPage() {
     }
   }, [isLoading, isAuthenticated, router])
 
+  useEffect(() => {
+    if (!isAuthenticated) return
+    fetch(`${API_BASE_URL}/api/v1/usuario/commodities/`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => setUserCommodities(data.commodity_ids ?? []))
+      .catch(() => setUserCommodities([]))
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && userCommodities !== null) {
+      if (userCommodities.length === 0) {
+        router.push('/dashboard/commodities')
+      }
+    }
+  }, [isLoading, isAuthenticated, userCommodities, router])
+
   async function handleLogout() {
     await logout()
     router.push('/')
   }
 
-  if (isLoading) {
+  if (isLoading || (isAuthenticated && userCommodities === null)) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-sm text-foreground/60">Carregando...</p>
@@ -30,26 +48,14 @@ export default function DashboardPage() {
 
   if (!isAuthenticated) return null
 
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4">
-      <div className="space-y-1 text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-          AgroComex
-        </p>
-        <h1 className="text-2xl font-bold text-foreground">
-          Bem-vindo, {user!.primeiro_nome || 'usuario'}
-        </h1>
-        <p className="text-sm text-foreground/60">
-          Grupo: {user!.group || '—'}
-        </p>
-      </div>
+  const userName = user!.primeiro_nome || "Usuario"
 
-      <Button
-        variant="outline"
-        onClick={handleLogout}
-      >
-        Sair
-      </Button>
-    </main>
+  return (
+    <div className="min-h-screen bg-background">
+      <TopMenu onLogout={handleLogout} />
+
+      <main className="pt-20 flex flex-1 flex-col items-center justify-center gap-6 px-4">
+      </main>
+    </div>
   )
 }

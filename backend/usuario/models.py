@@ -10,6 +10,14 @@ class Usuario(models.Model):
         blank=True,
         related_name="usuarios"
     )
+    first_name = models.CharField(max_length=150, blank=True, default='')
+    last_name = models.CharField(max_length=150, blank=True, default='')
+    commodities = models.ManyToManyField(
+        'commodities.Comomodity',
+        blank=True,
+        related_name='usuarios_m2m',
+        db_table='usuario_commodity',
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 

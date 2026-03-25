@@ -35,6 +35,8 @@ Catálogo de estruturas financeiras que o sistema consegue precificar. Não é c
 ### `usuario`
 Perfil de usuário da aplicação, estendendo `auth.User` do Django via `OneToOneField`. `primeiro_nome` e `sobrenome` são lidos diretamente de `auth_user`.
 
+Relacionamento M2M com `commodities.Comomodity` via campo `commodities` (tabela `usuario_commodity`). Usado para persistir as commodities de interesse do usuário, exibidas no dashboard.
+
 ### `dados`
 Cache local de preços de fechamento para cálculo de volatilidade histórica. Possível remoção futura, substituída por consulta direta à API de mercado.
 
@@ -92,11 +94,13 @@ Todos os endpoints seguem o padrao REST gerado pelo `DefaultRouter` do DRF. O pr
 
 | Metodo | URL | Descricao |
 |--------|-----|-----------|
-| GET | `/api/v1/commodities/` | Lista todas as commodities |
+| GET | `/api/v1/commodities/` | Lista commodities ativas (paginado 10/pag, busca por `?search=`, requer auth) |
 | POST | `/api/v1/commodities/` | Cria uma commodity |
 | GET | `/api/v1/commodities/{id}/` | Detalhe de uma commodity |
 | PUT/PATCH | `/api/v1/commodities/{id}/` | Atualiza uma commodity |
 | DELETE | `/api/v1/commodities/{id}/` | Remove uma commodity |
+| GET | `/api/v1/usuario/commodities/` | Retorna IDs das commodities selecionadas pelo usuario autenticado |
+| PUT | `/api/v1/usuario/commodities/` | Substitui a selecao completa do usuario (lista de IDs inteiros) |
 | GET/POST | `/api/v1/meses_contrato_futuro/` | Lista / cria meses de contrato futuro |
 | GET/PUT/PATCH/DELETE | `/api/v1/meses_contrato_futuro/{id}/` | Detalhe / atualiza / remove |
 | GET/POST | `/api/v1/tipos_derivativo/` | Lista / cria tipos de derivativo |
@@ -116,7 +120,11 @@ Cada app registra seu proprio router e expoe `urlpatterns = router.urls`. O `cor
 
 ### Observacoes sobre autorizacao
 
-Os ViewSets usam `ModelViewSet` sem restricao de permissao configurada — qualquer requisicao autenticada ou anonima tem acesso completo. Antes de ir para producao, e obrigatorio configurar `permission_classes` e `authentication_classes` nos ViewSets ou globalmente em `settings.py` (via `DEFAULT_PERMISSION_CLASSES`).
+A maioria dos ViewSets usa `ModelViewSet` sem restricao de permissao configurada. Excecoes com autorizacao ja configurada:
+- `ComomodityViewSet` — `permission_classes = [IsAuthenticated]`
+- `UserCommoditiesView` — `permission_classes = [IsAuthenticated]`, opera exclusivamente sobre `request.user.usuarios` (sem aceitar `user_id` externo)
+
+Antes de ir para producao, e obrigatorio configurar `permission_classes` nos demais ViewSets ou globalmente em `settings.py` (via `DEFAULT_PERMISSION_CLASSES`).
 
 ---
 
@@ -195,7 +203,7 @@ Usado em `ResultadoAnalise` para `taxa_juros_utilizada` e correcao monetaria.
 
 ### Tarefas periodicas (django-celery-beat)
 
-Configuradas via migration `dados/0002_periodic_tasks.py`. Todas ativas por padrao, timezone `America/Sao_Paulo`.
+Configuradas via migration `dados/0002_periodic_tasks.py`. Todas ativas por padrao, timezone `America/Sao_Paulo`. Os paths das tasks foram corrigidos pela migration `dados/0004_update_task_paths.py` apos reorganizacao em submodulos (`dados/tasks/agrobr.py` e `dados/tasks/bcb.py`).
 
 ---
 
