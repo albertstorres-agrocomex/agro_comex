@@ -101,10 +101,7 @@ export function AnaliseCard({ analise }: Props) {
             {/* Botao expandir */}
             <button
               onClick={() => setIsOpen((v) => !v)}
-              className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center transition-opacity hover:opacity-80"
-              style={{
-                background: "oklch(0.785 0.016 88 / 0.15)",
-              }}
+              className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center transition-opacity hover:opacity-80 bg-muted/15"
               aria-label={isOpen ? "Recolher" : "Expandir"}
             >
               {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}

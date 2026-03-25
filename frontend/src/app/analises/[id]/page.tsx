@@ -147,7 +147,7 @@ export default function AnaliseDetailPage() {
                   })}
                 </p>
 
-                {solicitacao.resultado ? (
+                {solicitacao.status === "concluido" && solicitacao.resultado ? (
                   <div className="rounded-[var(--radius-xl)] border border-border bg-background p-4 space-y-3">
                     <h3 className="text-sm font-semibold text-foreground">Resultado da Analise</h3>
                     {solicitacao.resultado.nivel_acumulacao !== null && (
@@ -256,6 +256,7 @@ export default function AnaliseDetailPage() {
 
                   {/* Detalhes em linha */}
                   {[
+                    { label: "Commodity", value: solicitacao.commodity_nome },
                     { label: "Tipo de Derivativo", value: solicitacao.tipo_derivativo_nome },
                     { label: "Rotulo", value: solicitacao.tipo_derivativo_rotulo },
                     ...(mesLabel ? [{ label: "Mes do Contrato", value: mesLabel }] : []),
