@@ -91,16 +91,24 @@ class AnaliseDetailSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
-    def get_time_ago(self, obj):
-        from django.utils.timesince import timesince
-        return timesince(obj.created_at)
+    def get_time_ago(self, obj) -> str:
+        seconds = int((timezone.now() - obj.created_at).total_seconds())
+        if seconds < 60:
+            return "agora"
+        if seconds < 3600:
+            m = seconds // 60
+            return f"{m}min ago"
+        if seconds < 86400:
+            h = seconds // 3600
+            return f"{h}h ago"
+        d = seconds // 86400
+        return f"{d}d ago"
 
-    def get_commodity_image_url(self, obj):
-        from commodities.models import Commodity
+    def get_commodity_image_url(self, obj) -> str | None:
         try:
-            c = Commodity.objects.get(codigo=obj.commodity_code)
-            return c.imagem_url or None
-        except Commodity.DoesNotExist:
+            commodity = Comomodity.objects.get(codigo=obj.commodity_code)
+            return commodity.imagem_url or None
+        except Comomodity.DoesNotExist:
             return None
 
 
