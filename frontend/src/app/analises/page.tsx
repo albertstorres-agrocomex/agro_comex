@@ -1,0 +1,224 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { TopMenu } from "@/components/system/layout/TopMenu";
+import { AnaliseCard } from "@/components/system/analise/AnaliseCard";
+import { AnaliseStatusPieChart } from "@/components/system/analise/AnaliseStatusPieChart";
+import { NovaAnaliseModal } from "@/components/system/analise/NovaAnaliseModal";
+import {
+  fetchAnalises,
+  fetchAnaliseStatusCount,
+  type AnaliseData,
+  type AnaliseStatus,
+  type AnaliseStatusCount,
+} from "@/services/analiseService";
+import { apiFetch } from "@/services/authService";
+
+const STATUS_TABS: { key: "todos" | AnaliseStatus; label: string }[] = [
+  { key: "todos", label: "Todos" },
+  { key: "pendente", label: "Pendente" },
+  { key: "em_analise", label: "Em Analise" },
+  { key: "aprovado", label: "Aprovado" },
+  { key: "rejeitado", label: "Rejeitado" },
+];
+
+interface CommodityOption {
+  codigo: string;
+  nome: string;
+  preco_atual?: string;
+  moeda: string;
+  unidade: string;
+}
+
+export default function AnalisesPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading, logout } = useAuth();
+
+  const [analises, setAnalises] = useState<AnaliseData[]>([]);
+  const [statusCount, setStatusCount] = useState<AnaliseStatusCount | null>(null);
+  const [commodities, setCommodities] = useState<CommodityOption[]>([]);
+  const [activeTab, setActiveTab] = useState<"todos" | AnaliseStatus>("todos");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const PAGE_SIZE = 6;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  async function handleLogout() {
+    await logout();
+    router.push("/");
+  }
+
+  const loadAnalises = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchAnalises(page, activeTab);
+      setAnalises(data.results);
+      setTotalCount(data.count);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, activeTab]);
+
+  const loadStatusCount = useCallback(async () => {
+    try {
+      const data = await fetchAnaliseStatusCount();
+      setStatusCount(data);
+    } catch {
+      // silencioso
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/");
+      return;
+    }
+    if (!isAuthenticated) return;
+    loadAnalises();
+    loadStatusCount();
+  }, [isLoading, isAuthenticated, router, loadAnalises, loadStatusCount]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    apiFetch("/api/v1/usuario/commodities/")
+      .then((r) => r.json())
+      .then((data) => setCommodities(data.commodities ?? data))
+      .catch(() => {});
+  }, [isAuthenticated]);
+
+  function handleTabChange(tab: "todos" | AnaliseStatus) {
+    setActiveTab(tab);
+    setPage(1);
+  }
+
+  function handleCreated() {
+    setPage(1);
+    loadAnalises();
+    loadStatusCount();
+  }
+
+  if (isLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-sm text-foreground/60">Carregando...</p>
+      </main>
+    );
+  }
+
+  if (!isAuthenticated) return null;
+
+  return (
+    <div className="h-screen overflow-hidden bg-background">
+      <TopMenu onLogout={handleLogout} />
+
+      <div
+        className="absolute inset-x-5 bottom-5 grid gap-2.5"
+        style={{
+          top: "calc(80px + 20px)",
+          gridTemplateColumns: "60% 1fr",
+          gridTemplateRows: "1fr",
+        }}
+      >
+        {/* Coluna esquerda */}
+        <div className="flex flex-col min-h-0 rounded-[var(--radius-2xl)] border border-border bg-card overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-border">
+            <h1 className="text-base font-bold text-foreground">Suas Analises</h1>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="bg-accent text-accent-foreground px-4 py-2 rounded-full text-sm font-semibold hover:brightness-105 transition-all"
+            >
+              + Nova Analise
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex items-center gap-1 px-4 py-2 shrink-0 border-b border-border overflow-x-auto">
+            {STATUS_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => handleTabChange(tab.key)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors shrink-0 ${
+                  activeTab === tab.key
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Lista */}
+          <div className="flex-1 overflow-y-auto px-3">
+            {loading ? (
+              <p className="text-sm text-muted-foreground px-1 py-4">Carregando...</p>
+            ) : analises.length === 0 ? (
+              <p className="text-sm text-muted-foreground px-1 py-4">Nenhuma analise encontrada.</p>
+            ) : (
+              analises.map((a) => <AnaliseCard key={a.id} analise={a} />)
+            )}
+          </div>
+
+          {/* Paginacao */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-2 shrink-0 border-t border-border">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-40 transition-opacity"
+              >
+                Anterior
+              </button>
+              <span className="text-xs text-muted-foreground">
+                {page} / {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-40 transition-opacity"
+              >
+                Proxima
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Coluna direita */}
+        <div className="flex flex-col gap-2.5 min-h-0">
+          {/* Grafico de status */}
+          <div className="flex-1 rounded-[var(--radius-2xl)] border border-border bg-card overflow-hidden flex flex-col">
+            <div className="px-4 py-3 shrink-0 border-b border-border">
+              <h2 className="text-base font-bold text-foreground">Distribuicao</h2>
+            </div>
+            <div className="flex-1 p-4">
+              {statusCount ? (
+                <AnaliseStatusPieChart counts={statusCount} />
+              ) : (
+                <div className="h-full animate-pulse bg-muted rounded-[var(--radius-xl)]" />
+              )}
+            </div>
+          </div>
+
+          {/* Placeholder inferior */}
+          <div
+            className="rounded-[var(--radius-2xl)] border border-border bg-card shrink-0"
+            style={{ height: "calc((100vh - 120px) / 3 - 10px)" }}
+          />
+        </div>
+      </div>
+
+      <NovaAnaliseModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onCreated={handleCreated}
+        commodities={commodities}
+      />
+    </div>
+  );
+}
