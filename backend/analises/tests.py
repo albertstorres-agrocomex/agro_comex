@@ -15,12 +15,10 @@ class StatusCountViewTest(TestCase):
         self.client = APIClient()
         self.user = User.objects.create_user(username="test@test.com", password="pass")
         self.perfil = Usuario.objects.get_or_create(user=self.user)[0]
-        self.commodity = Comomodity.objects.first()
-        self.tipo = TipoDerivativo.objects.first()
-        if self.commodity is None:
-            self.commodity = Comomodity.objects.create(nome="Soja", codigo="SOJ")
-        if self.tipo is None:
-            self.tipo = TipoDerivativo.objects.create(nome="Futuro")
+        self.commodity = Comomodity.objects.create(
+            nome="Soja", codigo="SOJ", bolsa="CME", unidade="bushel", moeda="USD"
+        )
+        self.tipo = TipoDerivativo.objects.create(nome="Futuro", rotulo="Futuro")
 
     def _make(self, st):
         return SolicitacaoAnalise.objects.create(
@@ -32,9 +30,10 @@ class StatusCountViewTest(TestCase):
         )
 
     def test_status_count_returns_avaliacao_aprovado_rejeitado(self):
-        self._make("concluido")
-        self._make("aprovado")
-        self._make("rejeitado")
+        self._make(SolicitacaoAnalise.Status.CONCLUIDO)
+        self._make(SolicitacaoAnalise.Status.APROVADO)
+        self._make(SolicitacaoAnalise.Status.REJEITADO)
+        self._make(SolicitacaoAnalise.Status.AGUARDANDO)
         self.client.force_authenticate(user=self.user)
         response = self.client.get("/api/v1/solicitacao_analise/status-count/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -42,7 +41,7 @@ class StatusCountViewTest(TestCase):
         self.assertEqual(data["avaliacao"], 1)
         self.assertEqual(data["aprovado"], 1)
         self.assertEqual(data["rejeitado"], 1)
-        self.assertEqual(data["total"], 3)
+        self.assertEqual(data["total"], 4)
         self.assertNotIn("aguardando", data)
         self.assertNotIn("concluido", data)
 
@@ -55,9 +54,12 @@ class StatusCountViewTest(TestCase):
             commodity=self.commodity,
             tipo_derivativo=self.tipo,
             preco_mercado_atual=100,
-            status="aprovado",
+            status=SolicitacaoAnalise.Status.APROVADO,
         )
-        self._make("aprovado")
+        self._make(SolicitacaoAnalise.Status.APROVADO)
         self.client.force_authenticate(user=self.user)
         response = self.client.get("/api/v1/solicitacao_analise/status-count/")
         self.assertEqual(response.json()["aprovado"], 1)
+        self.assertEqual(response.json()["avaliacao"], 0)
+        self.assertEqual(response.json()["rejeitado"], 0)
+        self.assertEqual(response.json()["total"], 1)

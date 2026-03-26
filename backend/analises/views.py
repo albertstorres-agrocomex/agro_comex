@@ -132,9 +132,9 @@ class SolicitacaoAnaliseStatusCountView(APIView):
         perfil = request.user.usuarios
         qs = SolicitacaoAnalise.objects.filter(usuario=perfil)
         counts = qs.aggregate(
-            avaliacao=Count("id", filter=Q(status="concluido")),
-            aprovado=Count("id", filter=Q(status="aprovado")),
-            rejeitado=Count("id", filter=Q(status="rejeitado")),
+            avaliacao=Count("id", filter=Q(status=SolicitacaoAnalise.Status.CONCLUIDO)),
+            aprovado=Count("id", filter=Q(status=SolicitacaoAnalise.Status.APROVADO)),
+            rejeitado=Count("id", filter=Q(status=SolicitacaoAnalise.Status.REJEITADO)),
         )
-        counts["total"] = sum(counts.values())
+        counts["total"] = qs.count()
         return Response(counts)
