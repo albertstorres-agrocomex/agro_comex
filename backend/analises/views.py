@@ -78,7 +78,43 @@ class SolicitacaoAnaliseDetailView(APIView):
         if obj is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         data = SolicitacaoAnaliseReadSerializer(obj).data
-        if obj.status == SolicitacaoAnalise.Status.CONCLUIDO:
+        if obj.status in (SolicitacaoAnalise.Status.CONCLUIDO, SolicitacaoAnalise.Status.APROVADO):
+            resultado = (
+                ResultadoAnalise.objects.filter(solicitacao=obj)
+                .order_by("-calculado_em")
+                .first()
+            )
+            if resultado:
+                data["resultado"] = ResultadoAnaliseSerializer(resultado).data
+        return Response(data)
+
+    def patch(self, request, pk):
+        obj = self._get_object(request, pk)
+        if obj is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        novo_status = request.data.get("status")
+        TRANSICOES_VALIDAS = {
+            SolicitacaoAnalise.Status.CONCLUIDO: {
+                SolicitacaoAnalise.Status.APROVADO,
+                SolicitacaoAnalise.Status.REJEITADO,
+            },
+            SolicitacaoAnalise.Status.AGUARDANDO: {
+                SolicitacaoAnalise.Status.REJEITADO,
+            },
+        }
+
+        permitidos = TRANSICOES_VALIDAS.get(obj.status, set())
+        if novo_status not in permitidos:
+            return Response(
+                {"detail": f"Transicao de '{obj.status}' para '{novo_status}' nao permitida."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        obj.status = novo_status
+        obj.save(update_fields=["status"])
+        data = SolicitacaoAnaliseReadSerializer(obj).data
+        if obj.status == SolicitacaoAnalise.Status.APROVADO:
             resultado = (
                 ResultadoAnalise.objects.filter(solicitacao=obj)
                 .order_by("-calculado_em")
@@ -96,10 +132,9 @@ class SolicitacaoAnaliseStatusCountView(APIView):
         perfil = request.user.usuarios
         qs = SolicitacaoAnalise.objects.filter(usuario=perfil)
         counts = qs.aggregate(
-            aguardando=Count("id", filter=Q(status="aguardando")),
-            processando=Count("id", filter=Q(status="processando")),
-            concluido=Count("id", filter=Q(status="concluido")),
-            erro=Count("id", filter=Q(status="erro")),
+            avaliacao=Count("id", filter=Q(status="concluido")),
+            aprovado=Count("id", filter=Q(status="aprovado")),
+            rejeitado=Count("id", filter=Q(status="rejeitado")),
         )
         counts["total"] = sum(counts.values())
         return Response(counts)
