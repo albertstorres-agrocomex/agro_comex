@@ -1,6 +1,6 @@
 import { apiFetch } from "./authService";
 
-export type SolicitacaoStatus = "aguardando" | "processando" | "concluido" | "erro";
+export type SolicitacaoStatus = "aguardando" | "processando" | "concluido" | "erro" | "aprovado" | "rejeitado";
 
 export interface SolicitacaoAnaliseData {
   id: number;
@@ -48,10 +48,9 @@ export interface SolicitacaoPaginatedResponse {
 }
 
 export interface SolicitacaoStatusCount {
-  aguardando: number;
-  processando: number;
-  concluido: number;
-  erro: number;
+  avaliacao: number;
+  aprovado: number;
+  rejeitado: number;
   total: number;
 }
 
@@ -135,4 +134,20 @@ export async function fetchMesesContrato(commodityId: number): Promise<MesContra
   if (!res.ok) throw new Error("Erro ao buscar meses de contrato");
   const data = await res.json();
   return data.results ?? data;
+}
+
+export async function avaliarSolicitacao(
+  id: number,
+  novoStatus: "aprovado" | "rejeitado"
+): Promise<SolicitacaoAnaliseData> {
+  const res = await apiFetch(`${BASE}/solicitacao_analise/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: novoStatus }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw Object.assign(new Error("Erro ao avaliar solicitacao"), { detail: err });
+  }
+  return res.json();
 }
