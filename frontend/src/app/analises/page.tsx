@@ -132,7 +132,7 @@ export default function AnalisesPage() {
             <h1 className="text-base font-bold text-foreground">Suas Analises</h1>
             <button
               onClick={() => setModalOpen(true)}
-              className="bg-accent text-accent-foreground px-4 py-2 rounded-full text-sm font-semibold hover:brightness-105 transition-all"
+              className="bg-[var(--info)] text-[var(--info-foreground)] px-4 py-2 rounded-full text-sm font-semibold hover:brightness-105 transition-all"
             >
               + Nova Analise
             </button>
