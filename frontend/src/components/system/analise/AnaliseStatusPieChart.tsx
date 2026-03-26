@@ -31,7 +31,7 @@ export function AnaliseStatusPieChart({ counts }: Props) {
     <PieChartComex
       data={data}
       config={config}
-      title="Distribuicao"
+
       totalValue={String(counts.total)}
       totalLabel="Total"
       valueFormatter={(v) => String(v)}
