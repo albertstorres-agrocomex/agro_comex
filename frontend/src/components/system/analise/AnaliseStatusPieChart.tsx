@@ -7,18 +7,16 @@ interface Props {
 }
 
 const config: ChartConfig = {
-  aguardando: { label: "Aguardando", color: "var(--chart-3)" },
-  processando: { label: "Processando", color: "var(--chart-4)" },
-  concluido: { label: "Concluido", color: "var(--success)" },
-  erro: { label: "Erro", color: "var(--destructive)" },
+  avaliacao: { label: "Avaliacao", color: "var(--info)" },
+  aprovado:  { label: "Aprovado",  color: "var(--success)" },
+  rejeitado: { label: "Rejeitado", color: "var(--destructive)" },
 };
 
 export function AnaliseStatusPieChart({ counts }: Props) {
   const data: PieChartDataItem[] = [
-    { label: "Aguardando", value: counts.aguardando, colorKey: "aguardando" },
-    { label: "Processando", value: counts.processando, colorKey: "processando" },
-    { label: "Concluido", value: counts.concluido, colorKey: "concluido" },
-    { label: "Erro", value: counts.erro, colorKey: "erro" },
+    { label: "Avaliacao", value: counts.avaliacao, colorKey: "avaliacao" },
+    { label: "Aprovado",  value: counts.aprovado,  colorKey: "aprovado" },
+    { label: "Rejeitado", value: counts.rejeitado, colorKey: "rejeitado" },
   ].filter((d) => d.value > 0);
 
   if (data.length === 0) {
@@ -33,7 +31,7 @@ export function AnaliseStatusPieChart({ counts }: Props) {
     <PieChartComex
       data={data}
       config={config}
-      title="Analises por Status"
+      title="Distribuicao"
       totalValue={String(counts.total)}
       totalLabel="Total"
       valueFormatter={(v) => String(v)}
