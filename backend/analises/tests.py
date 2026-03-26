@@ -41,7 +41,8 @@ class StatusCountViewTest(TestCase):
         self.assertEqual(data["avaliacao"], 1)
         self.assertEqual(data["aprovado"], 1)
         self.assertEqual(data["rejeitado"], 1)
-        self.assertEqual(data["total"], 4)
+        # total reflects only the 3 displayed segments, not all user records
+        self.assertEqual(data["total"], 3)
         self.assertNotIn("aguardando", data)
         self.assertNotIn("concluido", data)
 

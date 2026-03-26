@@ -136,5 +136,5 @@ class SolicitacaoAnaliseStatusCountView(APIView):
             aprovado=Count("id", filter=Q(status=SolicitacaoAnalise.Status.APROVADO)),
             rejeitado=Count("id", filter=Q(status=SolicitacaoAnalise.Status.REJEITADO)),
         )
-        counts["total"] = qs.count()
+        counts["total"] = sum(counts.values())
         return Response(counts)
