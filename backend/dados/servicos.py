@@ -113,7 +113,7 @@ def persistir_exportacao_mensal(registros: list[dict[str, Any]]) -> int:
     from dados.models import ExportacaoMensal
     from commodities.models import Comomodity
 
-    codigos = {r["codigo_commodity"] for r in registros}
+    codigos = {r.get("codigo_commodity") for r in registros} - {None}
     commodities_map = {
         c.codigo: c
         for c in Comomodity.objects.filter(codigo__in=codigos, ativo=True)
@@ -121,8 +121,15 @@ def persistir_exportacao_mensal(registros: list[dict[str, Any]]) -> int:
 
     count = 0
     for registro in registros:
-        commodity = commodities_map.get(registro["codigo_commodity"])
+        codigo = registro.get("codigo_commodity")
+        if not codigo:
+            continue
+        commodity = commodities_map.get(codigo)
         if not commodity:
+            logger.debug(
+                "persistir_exportacao_mensal: commodity '%s' nao encontrada ou inativa, registro ignorado.",
+                codigo,
+            )
             continue
         ExportacaoMensal.objects.update_or_create(
             commodity=commodity,
