@@ -23,7 +23,7 @@ def reverter_migracao(apps, schema_editor):
     CacheDadosMercado = apps.get_model("dados", "CacheDadosMercado")
     ExportacaoMensal = apps.get_model("dados", "ExportacaoMensal")
 
-    registros = list(ExportacaoMensal.objects.all())
+    registros = list(ExportacaoMensal.objects.filter(fonte="COMEXSTAT_EXPORT"))
     para_criar = [
         CacheDadosMercado(
             commodity_id=r.commodity_id,
@@ -34,7 +34,7 @@ def reverter_migracao(apps, schema_editor):
         for r in registros
     ]
     CacheDadosMercado.objects.bulk_create(para_criar, ignore_conflicts=True)
-    ExportacaoMensal.objects.all().delete()
+    ExportacaoMensal.objects.filter(fonte="COMEXSTAT_EXPORT").delete()
 
 
 class Migration(migrations.Migration):
