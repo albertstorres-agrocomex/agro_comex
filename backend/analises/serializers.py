@@ -40,9 +40,13 @@ class SolicitacaoAnaliseCreateSerializer(serializers.ModelSerializer):
         if tipo.posicao_implicita and not validated_data.get("posicao"):
             validated_data["posicao"] = tipo.posicao_implicita
 
+        # Filtrar apenas fontes de preco unitario — COMEXSTAT_EXPORT reside em ExportacaoMensal
         ultimo = (
             CacheDadosMercado.objects
-            .filter(commodity=commodity)
+            .filter(
+                commodity=commodity,
+                fonte__in=["CEPEA_SPOT", "B3_FUTUROS"],
+            )
             .order_by("-data_preco")
             .values_list("preco_fechamento", flat=True)
             .first()
