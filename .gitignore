@@ -45,6 +45,9 @@ Thumbs.db
 # Vercel
 .vercel
 
+# Git worktrees
+.worktrees/
+
 # Claude Code local settings
 .claude/*.local.json
 .claude/*.local.md
@@ -60,3 +63,4 @@ BACKEND_TECHNICAL_DOC.md
 FRONTEND_TECHNICAL_DOC.md
 SOLUCOES_SEMELHANTES.md
 IMPLEMENTACAO_REDIS_E_CELERY.md
+EXPLICACAO_LIMPEZA_BUSCA.md
