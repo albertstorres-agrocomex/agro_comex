@@ -5,6 +5,14 @@ def migrar_comexstat_para_exportacao_mensal(apps, schema_editor):
     CacheDadosMercado = apps.get_model("dados", "CacheDadosMercado")
     ExportacaoMensal = apps.get_model("dados", "ExportacaoMensal")
 
+    # Preflight: ensure no conflicts exist before attempting migration
+    existentes = ExportacaoMensal.objects.filter(fonte="COMEXSTAT_EXPORT").count()
+    if existentes > 0:
+        raise Exception(
+            f"Abortando migracao: ExportacaoMensal ja contem {existentes} registros "
+            f"com fonte='COMEXSTAT_EXPORT'. Investigue antes de prosseguir."
+        )
+
     registros = list(CacheDadosMercado.objects.filter(fonte="COMEXSTAT_EXPORT"))
     para_criar = [
         ExportacaoMensal(
@@ -15,7 +23,9 @@ def migrar_comexstat_para_exportacao_mensal(apps, schema_editor):
         )
         for r in registros
     ]
-    ExportacaoMensal.objects.bulk_create(para_criar, ignore_conflicts=True)
+    # A migracao e automaticamente atomica no PostgreSQL (transactional DDL).
+    # Se bulk_create falhar, o delete nao sera executado e a transacao sera revertida.
+    ExportacaoMensal.objects.bulk_create(para_criar)
     CacheDadosMercado.objects.filter(fonte="COMEXSTAT_EXPORT").delete()
 
 
@@ -33,7 +43,7 @@ def reverter_migracao(apps, schema_editor):
         )
         for r in registros
     ]
-    CacheDadosMercado.objects.bulk_create(para_criar, ignore_conflicts=True)
+    CacheDadosMercado.objects.bulk_create(para_criar)
     ExportacaoMensal.objects.filter(fonte="COMEXSTAT_EXPORT").delete()
 
 
