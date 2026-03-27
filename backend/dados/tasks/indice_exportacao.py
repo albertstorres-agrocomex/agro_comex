@@ -31,7 +31,7 @@ def _cache_key(commodity_ids: list[int]) -> str:
 def calcular_indice_exportacao(self, commodity_ids: list[int]) -> dict:
     """
     Calcula indice de exportacao base 100 por trimestre para as commodities
-    indicadas. Utiliza dados COMEXSTAT_EXPORT de CacheDadosMercado.
+    indicadas. Utiliza dados de ExportacaoMensal (fonte: COMEXSTAT_EXPORT).
 
     Fluxo: API -> Redis (verifica cache) -> Celery (computa) -> Redis (armazena)
 
@@ -40,7 +40,7 @@ def calcular_indice_exportacao(self, commodity_ids: list[int]) -> dict:
     Resultado armazenado em cache Redis por 6 horas.
     """
     from commodities.models import Comomodity
-    from dados.models import CacheDadosMercado
+    from dados.models import ExportacaoMensal
 
     key = _cache_key(commodity_ids)
     cached = cache.get(key)
@@ -59,21 +59,20 @@ def calcular_indice_exportacao(self, commodity_ids: list[int]) -> dict:
 
     cutoff_year = date.today().year - LOOKBACK_YEARS
 
-    qs = CacheDadosMercado.objects.filter(
+    qs = ExportacaoMensal.objects.filter(
         commodity_id__in=[c["id"] for c in commodities],
-        fonte="COMEXSTAT_EXPORT",
-        data_preco__year__gte=cutoff_year,
-    ).values("commodity_id", "data_preco", "preco_fechamento")
+        data_referencia__year__gte=cutoff_year,
+    ).values("commodity_id", "data_referencia", "valor_fob_usd")
 
     # totais[cid][(ano, trimestre)] = soma FOB mensal (centavos de USD)
     totais: dict[int, dict[tuple, int]] = {c["id"]: {} for c in commodities}
 
     for row in qs:
         cid = row["commodity_id"]
-        dp = row["data_preco"]
+        dp = row["data_referencia"]
         q_num = (dp.month - 1) // 3 + 1
         key_q = (dp.year, q_num)
-        totais[cid][key_q] = totais[cid].get(key_q, 0) + row["preco_fechamento"]
+        totais[cid][key_q] = totais[cid].get(key_q, 0) + row["valor_fob_usd"]
 
     # Janela dinamica: union de todos os trimestres com dado, excluindo o
     # trimestre atual (incompleto), tomando os N_TRIMESTRES mais recentes

@@ -129,3 +129,42 @@ class NormalizarExportacaoTest(TestCase):
         df = self._make_df()
         resultado = normalizar_exportacao(df, cultura="soja", fonte="COMEXSTAT_EXPORT")
         self.assertEqual(resultado[0]["data_referencia"], date(2025, 1, 1))
+
+
+class CalcularIndiceExportacaoTest(TestCase):
+    def setUp(self):
+        from datetime import date
+        self.soja = Comomodity.objects.create(
+            codigo="ZS", nome="Soja", bolsa="CME",
+            unidade="bushel", moeda="USD", ativo=True,
+        )
+        meses = [
+            (2024, 1, 44000000000),
+            (2024, 4, 48000000000),
+            (2024, 7, 50000000000),
+            (2024, 10, 46000000000),
+            (2025, 1, 55000000000),
+            (2025, 4, 52000000000),
+        ]
+        for ano, mes, valor in meses:
+            ExportacaoMensal.objects.create(
+                commodity=self.soja,
+                data_referencia=date(ano, mes, 1),
+                valor_fob_usd=valor,
+                fonte="COMEXSTAT_EXPORT",
+            )
+
+    def test_retorna_chart_data_com_trimestres(self):
+        from dados.tasks.indice_exportacao import calcular_indice_exportacao
+        resultado = calcular_indice_exportacao([self.soja.id])
+        self.assertIn("chart_data", resultado)
+        self.assertIn("series", resultado)
+        self.assertGreater(len(resultado["chart_data"]), 0)
+
+    def test_nao_usa_cache_dados_mercado(self):
+        """Confirma que o calculo nao depende mais de CacheDadosMercado."""
+        from dados.models import CacheDadosMercado
+        from dados.tasks.indice_exportacao import calcular_indice_exportacao
+        self.assertEqual(CacheDadosMercado.objects.filter(fonte="COMEXSTAT_EXPORT").count(), 0)
+        resultado = calcular_indice_exportacao([self.soja.id])
+        self.assertGreater(len(resultado["chart_data"]), 0)
