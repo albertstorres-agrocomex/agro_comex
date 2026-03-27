@@ -145,7 +145,7 @@ def normalizar_exportacao(df: pd.DataFrame, cultura: str, fonte: str) -> list[di
     """
     COLUNA_ANO   = "ano"
     COLUNA_MES   = "mes"
-    COLUNA_VALOR = "valor_fob_usd"   # era "valor_fob_dolar" — nome real da lib
+    COLUNA_VALOR = "valor_fob_usd"
 
     codigo = COMMODITY_NOME_PARA_CODIGO.get(cultura)
     if codigo is None:
