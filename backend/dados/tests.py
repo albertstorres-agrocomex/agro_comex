@@ -160,11 +160,12 @@ class CalcularIndiceExportacaoTest(TestCase):
         self.assertIn("chart_data", resultado)
         self.assertIn("series", resultado)
         self.assertGreater(len(resultado["chart_data"]), 0)
+        first_entry = resultado["chart_data"][0]
+        self.assertEqual(first_entry["ZS"], 100.0)
 
     def test_nao_usa_cache_dados_mercado(self):
         """Confirma que o calculo nao depende mais de CacheDadosMercado."""
-        from dados.models import CacheDadosMercado
         from dados.tasks.indice_exportacao import calcular_indice_exportacao
-        self.assertEqual(CacheDadosMercado.objects.filter(fonte="COMEXSTAT_EXPORT").count(), 0)
         resultado = calcular_indice_exportacao([self.soja.id])
+        self.assertEqual(len(resultado["series"]), 1)
         self.assertGreater(len(resultado["chart_data"]), 0)
