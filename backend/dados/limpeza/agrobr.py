@@ -140,7 +140,8 @@ def normalizar_exportacao(df: pd.DataFrame, cultura: str, fonte: str) -> list[di
     Schema real do agrobr (contracts/datasets.py — EXPORTACAO_V1):
       ano, mes, produto, uf, kg_liquido, valor_fob_usd
 
-    preco_fechamento armazena valor FOB em centavos de dolar (x100).
+    valor_fob_usd armazena valor FOB em centavos de dolar (valor_fob * 100).
+    Retorna dicts compatíveis com persistir_exportacao_mensal().
     """
     COLUNA_ANO   = "ano"
     COLUNA_MES   = "mes"
@@ -169,8 +170,8 @@ def normalizar_exportacao(df: pd.DataFrame, cultura: str, fonte: str) -> list[di
         try:
             registros.append({
                 "codigo_commodity": codigo,
-                "data_preco":       date(int(row[COLUNA_ANO]), int(row[COLUNA_MES]), 1),
-                "preco_fechamento": int(float(row[COLUNA_VALOR]) * 100),
+                "data_referencia":  date(int(row[COLUNA_ANO]), int(row[COLUNA_MES]), 1),
+                "valor_fob_usd":    int(float(row[COLUNA_VALOR]) * 100),
                 "fonte":            fonte,
             })
         except (ValueError, TypeError, KeyError):

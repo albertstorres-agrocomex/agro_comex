@@ -97,3 +97,35 @@ class PersistirExportacaoMensalTest(TestCase):
         count = persistir_exportacao_mensal(registros)
         self.assertEqual(count, 0)
         self.assertEqual(ExportacaoMensal.objects.count(), 0)
+
+
+class NormalizarExportacaoTest(TestCase):
+    def _make_df(self):
+        import pandas as pd
+        return pd.DataFrame([
+            {"ano": 2025, "mes": 1, "produto": "soja", "uf": "MT", "kg_liquido": 1000000, "valor_fob_usd": 445948.75},
+            {"ano": 2025, "mes": 2, "produto": "soja", "uf": "MT", "kg_liquido": 900000, "valor_fob_usd": None},
+        ])
+
+    def test_retorna_chaves_corretas(self):
+        from dados.limpeza.agrobr import normalizar_exportacao
+        df = self._make_df()
+        resultado = normalizar_exportacao(df, cultura="soja", fonte="COMEXSTAT_EXPORT")
+        self.assertEqual(len(resultado), 1)  # row with None is ignored
+        self.assertIn("data_referencia", resultado[0])
+        self.assertIn("valor_fob_usd", resultado[0])
+        self.assertNotIn("data_preco", resultado[0])
+        self.assertNotIn("preco_fechamento", resultado[0])
+
+    def test_converte_para_centavos(self):
+        from dados.limpeza.agrobr import normalizar_exportacao
+        df = self._make_df()
+        resultado = normalizar_exportacao(df, cultura="soja", fonte="COMEXSTAT_EXPORT")
+        self.assertEqual(resultado[0]["valor_fob_usd"], 44594875)  # 445948.75 * 100
+
+    def test_data_referencia_primeiro_dia_do_mes(self):
+        from datetime import date
+        from dados.limpeza.agrobr import normalizar_exportacao
+        df = self._make_df()
+        resultado = normalizar_exportacao(df, cultura="soja", fonte="COMEXSTAT_EXPORT")
+        self.assertEqual(resultado[0]["data_referencia"], date(2025, 1, 1))

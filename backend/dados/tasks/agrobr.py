@@ -123,7 +123,7 @@ def atualizar_exportacao(self):
     """
     from agrobr import datasets
     from dados.limpeza.agrobr import normalizar_exportacao
-    from dados.servicos import persistir_cache_dados_mercado
+    from dados.servicos import persistir_exportacao_mensal
 
     ano_atual = date.today().year
     CULTURAS = ["soja", "milho", "cafe", "acucar"]
@@ -144,8 +144,8 @@ def atualizar_exportacao(self):
                 )
                 continue
 
-    persistidos = persistir_cache_dados_mercado(todos_registros)
-    logger.info("Exportacao: %d registros persistidos.", persistidos)
+    persistidos = persistir_exportacao_mensal(todos_registros)
+    logger.info("COMEXSTAT: %d registros persistidos em ExportacaoMensal.", persistidos)
     return {"fonte": "COMEXSTAT_EXPORT", "registros": persistidos}
 
 
