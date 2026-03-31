@@ -10,6 +10,8 @@ class SolicitacaoAnalise(models.Model):
         PROCESSANDO = "processando"
         CONCLUIDO = "concluido"
         ERRO = "erro"
+        APROVADO = "aprovado"
+        REJEITADO = "rejeitado"
 
     usuario = models.ForeignKey(
         Usuario, 
@@ -33,6 +35,8 @@ class SolicitacaoAnalise(models.Model):
         blank=True
     )
     preco_mercado_atual = models.IntegerField()
+    preco_exercicio = models.IntegerField(null=True, blank=True)
+    quantidade_sacas = models.IntegerField(null=True, blank=True)
     posicao = models.CharField(max_length=12, null=True, blank=True)
     nivel_barreira = models.IntegerField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.AGUARDANDO)
@@ -49,7 +53,10 @@ class ResultadoAnalise(models.Model):
         SolicitacaoAnalise, 
         on_delete=models.CASCADE
     )
-    nivel_acumulacao = models.IntegerField(null=True, blank=True)
+    premio_calculado = models.IntegerField(null=True, blank=True)
+    percentual_premio = models.DecimalField(max_digits=8, decimal_places=4, null=True, blank=True)
+    valor_total_contrato = models.IntegerField(null=True, blank=True)
+    lucro_maximo = models.IntegerField(null=True, blank=True)
     volatilidade_utilizada = models.DecimalField(max_digits=8, decimal_places=6, null=True, blank=True)
     taxa_juros_utilizada = models.DecimalField(max_digits=8, decimal_places=6, null=True, blank=True)
     dados_brutos = models.JSONField(null=True, blank=True)
