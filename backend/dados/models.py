@@ -49,3 +49,25 @@ class DadosMacroeconomicos(models.Model):
         indexes         = [models.Index(fields=["indicador", "data"])]
 
 
+class ExportacaoMensal(models.Model):
+    """
+    Armazena valor FOB mensal de exportacao por commodity (fonte: COMEXSTAT/Comex Stat).
+    Separado de CacheDadosMercado, que contem exclusivamente series de preco unitario.
+    valor_fob_usd: valor FOB total exportado no mes em centavos de USD (valor_fob * 100).
+    """
+    FONTES = [
+        ("COMEXSTAT_EXPORT", "ComexStat — Exportacao"),
+    ]
+
+    commodity = models.ForeignKey(
+        Comomodity,
+        on_delete=models.PROTECT,
+    )
+    data_referencia = models.DateField()
+    valor_fob_usd = models.BigIntegerField()
+    fonte = models.CharField(max_length=50, choices=FONTES)
+    obtido_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "exportacao_mensal"
+        unique_together = ("commodity", "data_referencia", "fonte")

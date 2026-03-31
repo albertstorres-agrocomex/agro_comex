@@ -98,3 +98,44 @@ def persistir_dados_macroeconomicos(registros: list[dict]) -> int:
             )
 
     return persistidos
+
+
+def persistir_exportacao_mensal(registros: list[dict[str, Any]]) -> int:
+    """
+    Recebe lista de dicts normalizados e faz upsert em ExportacaoMensal.
+
+    Formato esperado de cada dict:
+      codigo_commodity: str
+      data_referencia: date
+      valor_fob_usd: int   (centavos de USD, valor_fob * 100)
+      fonte: str
+    """
+    from dados.models import ExportacaoMensal
+    from commodities.models import Comomodity
+
+    codigos = {r.get("codigo_commodity") for r in registros} - {None}
+    commodities_map = {
+        c.codigo: c
+        for c in Comomodity.objects.filter(codigo__in=codigos, ativo=True)
+    }
+
+    count = 0
+    for registro in registros:
+        codigo = registro.get("codigo_commodity")
+        if not codigo:
+            continue
+        commodity = commodities_map.get(codigo)
+        if not commodity:
+            logger.debug(
+                "persistir_exportacao_mensal: commodity '%s' nao encontrada ou inativa, registro ignorado.",
+                codigo,
+            )
+            continue
+        ExportacaoMensal.objects.update_or_create(
+            commodity=commodity,
+            data_referencia=registro["data_referencia"],
+            fonte=registro["fonte"],
+            defaults={"valor_fob_usd": registro["valor_fob_usd"]},
+        )
+        count += 1
+    return count

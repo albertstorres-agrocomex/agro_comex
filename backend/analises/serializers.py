@@ -73,6 +73,7 @@ class SolicitacaoAnaliseCreateSerializer(serializers.ModelSerializer):
             elif unidade == "toneladas":
                 quantidade_sacas = toneladas_para_sacas(quantidade, commodity.codigo)
 
+        # Filtrar apenas fontes de preco unitario — COMEXSTAT_EXPORT reside em ExportacaoMensal
         ultimo = (
             CacheDadosMercado.objects
             .filter(
