@@ -29,10 +29,10 @@ def processar_analise(self, solicitacao_id: int) -> dict:
     solicitacao.save(update_fields=["status"])
 
     try:
-        from analises.calculators import executar_calculo_bs
+        from analises.calculators import executar_calculo_bs, executar_analise_cenarios
         resultado = executar_calculo_bs(solicitacao)
 
-        ResultadoAnalise.objects.create(
+        resultado_obj = ResultadoAnalise.objects.create(
             solicitacao=solicitacao,
             premio_calculado=resultado["premio_calculado"],
             percentual_premio=resultado["percentual_premio"],
@@ -43,10 +43,34 @@ def processar_analise(self, solicitacao_id: int) -> dict:
             dados_brutos=resultado["dados_brutos"],
         )
 
+        # motor de cenarios
+        from analises.models import CenarioAnalise, PontoCurvaResultado
+        cenarios_data = executar_analise_cenarios(solicitacao)
+
+        for dados_cenario in cenarios_data:
+            pontos_curva = dados_cenario.pop("pontos_curva")
+            cenario_obj = CenarioAnalise.objects.create(
+                resultado=resultado_obj,
+                **dados_cenario,
+            )
+            PontoCurvaResultado.objects.bulk_create([
+                PontoCurvaResultado(
+                    cenario=cenario_obj,
+                    preco_centavos=p["preco_centavos"],
+                    resultado_centavos=p["resultado_centavos"],
+                )
+                for p in pontos_curva
+            ])
+
         solicitacao.status = SolicitacaoAnalise.Status.CONCLUIDO
         solicitacao.save(update_fields=["status"])
 
-        logger.info("Analise %s concluida. Premio: %s centavos.", solicitacao_id, resultado["premio_calculado"])
+        logger.info(
+            "Analise %s concluida. Premio: %s centavos. Cenarios: %s.",
+            solicitacao_id,
+            resultado["premio_calculado"],
+            [c["nome"] for c in cenarios_data],
+        )
         return {"solicitacao_id": solicitacao_id, "status": "concluido"}
 
     except Exception as exc:
