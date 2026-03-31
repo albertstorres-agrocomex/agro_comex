@@ -47,6 +47,9 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
   const [mesId, setMesId] = useState<string>("");
   const [posicao, setPosicao] = useState<"comprador" | "vendedor" | "">("");
   const [nivelBarreira, setNivelBarreira] = useState<string>("");
+  const [precoExercicio, setPrecoExercicio] = useState<string>("");
+  const [quantidade, setQuantidade] = useState<string>("");
+  const [unidadeQuantidade, setUnidadeQuantidade] = useState<"sacas" | "toneladas" | "">("");
 
   const [tipos, setTipos] = useState<TipoDerivativo[]>([]);
   const [meses, setMeses] = useState<MesContrato[]>([]);
@@ -87,6 +90,9 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
       setMesId("");
       setPosicao("");
       setNivelBarreira("");
+      setPrecoExercicio("");
+      setQuantidade("");
+      setUnidadeQuantidade("");
       setMeses([]);
       setError("");
     }
@@ -101,6 +107,18 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
     e.preventDefault();
     if (!commodityId || !tipoId) {
       setError("Selecione a commodity e o tipo de derivativo.");
+      return;
+    }
+    if (!mesId) {
+      setError("Selecione o mes do contrato.");
+      return;
+    }
+    if (!precoExercicio) {
+      setError("Informe o valor do contrato.");
+      return;
+    }
+    if (!quantidade || !unidadeQuantidade) {
+      setError("Informe a quantidade e a unidade.");
       return;
     }
     if (tipo?.requer_posicao && !tipo?.posicao_implicita && !posicao) {
@@ -118,7 +136,10 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
       await createSolicitacao({
         commodity: Number(commodityId),
         tipo_derivativo: Number(tipoId),
-        mes_contrato: mesId ? Number(mesId) : null,
+        mes_contrato: Number(mesId),
+        preco_exercicio: Math.round(parseFloat(precoExercicio) * 100),
+        quantidade: Number(quantidade),
+        unidade_quantidade: unidadeQuantidade as "sacas" | "toneladas",
         posicao: posicao || null,
         nivel_barreira: nivelBarreira ? Number(nivelBarreira) : null,
       });
@@ -192,10 +213,7 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
           {/* Mes do contrato */}
           {commodityId && (
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">
-                Mes do Contrato
-                <span className="ml-1 text-muted-foreground font-normal">(opcional)</span>
-              </Label>
+              <Label className="text-xs font-semibold">Mes do Contrato</Label>
               <Select
                 value={mesId}
                 onValueChange={setMesId}
@@ -223,6 +241,56 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
               </Select>
             </div>
           )}
+
+          {/* Valor do contrato */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Valor do Contrato</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                {commodity?.moeda ?? ""}
+              </span>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={precoExercicio}
+                onChange={(e) => setPrecoExercicio(e.target.value)}
+                placeholder="0.00"
+                className="h-9 text-sm pl-10"
+              />
+            </div>
+          </div>
+
+          {/* Quantidade e unidade */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Quantidade</Label>
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                value={quantidade}
+                onChange={(e) => setQuantidade(e.target.value)}
+                placeholder="Ex: 1000"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Unidade</Label>
+              <Select
+                value={unidadeQuantidade}
+                onValueChange={(v) => setUnidadeQuantidade(v as "sacas" | "toneladas")}
+              >
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sacas">Sacas</SelectItem>
+                  <SelectItem value="toneladas">Toneladas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           {/* Posicao — apenas quando requerida E nao implicita no tipo */}
           {tipo?.requer_posicao && !tipo?.posicao_implicita && (
@@ -274,8 +342,8 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
             <Button
               type="submit"
               size="sm"
-              disabled={loading}
-              className="bg-accent text-accent-foreground hover:brightness-105 rounded-full px-4"
+              disabled={loading || loadingMeses}
+              className="bg-info text-info-foreground hover:brightness-105 rounded-full px-4"
             >
               {loading ? "Enviando..." : "Solicitar Analise"}
             </Button>
