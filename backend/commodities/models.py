@@ -7,6 +7,7 @@ class Comomodity(models.Model):
     unidade = models.CharField(max_length=30)
     moeda = models.CharField(max_length=5)
     ativo = models.BooleanField(default=True)
+    imagem_url = models.URLField(max_length=500, blank=True, null=True)
 
 
     class Meta:
