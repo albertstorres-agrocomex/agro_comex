@@ -317,3 +317,57 @@ class TestCenarioAnaliseModel(TestCase):
                 valor_total_centavos=280000, ponto_equilibrio_centavos=11420,
                 nivel_risco="baixo", e_recomendado=False,
             )
+
+
+class TestCalcularCurvaResultado:
+    def test_retorna_25_pontos(self):
+        from analises.calculators import calcular_curva_resultado
+        pontos = calcular_curva_resultado(S=130.0, K=117.0, premio=2.80, posicao="vendedor", tipo="put")
+        assert len(pontos) == 25
+
+    def test_todos_pontos_tem_chaves_corretas(self):
+        from analises.calculators import calcular_curva_resultado
+        pontos = calcular_curva_resultado(S=130.0, K=117.0, premio=2.80, posicao="vendedor", tipo="put")
+        for p in pontos:
+            assert "preco_centavos" in p
+            assert "resultado_centavos" in p
+
+    def test_put_vendedor_lucro_maximo_quando_preco_alto(self):
+        # Quando preco final >> K, put nao e exercida: resultado = +premio
+        from analises.calculators import calcular_curva_resultado
+        pontos = calcular_curva_resultado(S=130.0, K=117.0, premio=2.80, posicao="vendedor", tipo="put")
+        ponto_alto = max(pontos, key=lambda p: p["preco_centavos"])
+        assert ponto_alto["resultado_centavos"] == round(2.80 * 100)  # +premio
+
+    def test_put_comprador_lucro_quando_preco_muito_baixo(self):
+        # Quando preco final << K, put comprador lucra: resultado = K - preco - premio
+        from analises.calculators import calcular_curva_resultado
+        K, premio = 117.0, 2.80
+        pontos = calcular_curva_resultado(S=130.0, K=K, premio=premio, posicao="comprador", tipo="put")
+        ponto_baixo = min(pontos, key=lambda p: p["preco_centavos"])
+        preco_baixo = ponto_baixo["preco_centavos"] / 100.0
+        esperado = round((max(0.0, K - preco_baixo) - premio) * 100)
+        assert ponto_baixo["resultado_centavos"] == esperado
+
+    def test_call_vendedor_lucro_maximo_quando_preco_baixo(self):
+        # Call vendedor: premio - max(0, preco - K). Preco baixo = max lucro = +premio
+        from analises.calculators import calcular_curva_resultado
+        pontos = calcular_curva_resultado(S=130.0, K=139.1, premio=1.50, posicao="vendedor", tipo="call")
+        ponto_baixo = min(pontos, key=lambda p: p["preco_centavos"])
+        assert ponto_baixo["resultado_centavos"] == round(1.50 * 100)
+
+    def test_precos_ordenados_crescentemente(self):
+        from analises.calculators import calcular_curva_resultado
+        pontos = calcular_curva_resultado(S=130.0, K=117.0, premio=2.80, posicao="vendedor", tipo="put")
+        precos = [p["preco_centavos"] for p in pontos]
+        assert precos == sorted(precos)
+
+    def test_preco_minimo_e_50_pct_de_S(self):
+        from analises.calculators import calcular_curva_resultado
+        pontos = calcular_curva_resultado(S=130.0, K=117.0, premio=2.80, posicao="vendedor", tipo="put")
+        assert pontos[0]["preco_centavos"] == round(130.0 * 0.5 * 100)
+
+    def test_preco_maximo_e_150_pct_de_S(self):
+        from analises.calculators import calcular_curva_resultado
+        pontos = calcular_curva_resultado(S=130.0, K=117.0, premio=2.80, posicao="vendedor", tipo="put")
+        assert pontos[-1]["preco_centavos"] == round(130.0 * 1.5 * 100)

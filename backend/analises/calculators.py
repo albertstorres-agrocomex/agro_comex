@@ -109,6 +109,44 @@ def toneladas_para_sacas(toneladas: float, codigo_commodity: str) -> int:
     return int(kg_total / peso_saca)
 
 
+def calcular_curva_resultado(
+    S: float,
+    K: float,
+    premio: float,
+    posicao: str,
+    tipo: str,
+) -> list[dict]:
+    """
+    Gera 25 pontos de resultado financeiro para um cenario,
+    cobrindo precos de 50% a 150% de S.
+
+    posicao : "comprador" | "vendedor"
+    tipo    : "call" | "put"
+    """
+    min_preco = S * 0.5
+    max_preco = S * 1.5
+    step = (max_preco - min_preco) / 24
+
+    pontos = []
+    for i in range(25):
+        preco = min_preco + step * i
+        if tipo == "put":
+            intrinseco = max(0.0, K - preco)
+        else:
+            intrinseco = max(0.0, preco - K)
+
+        if posicao == "vendedor":
+            resultado = premio - intrinseco
+        else:
+            resultado = intrinseco - premio
+
+        pontos.append({
+            "preco_centavos":     round(preco * 100),
+            "resultado_centavos": round(resultado * 100),
+        })
+    return pontos
+
+
 def executar_calculo_bs(solicitacao) -> dict:
     """
     Orquestra o calculo Black-Scholes para uma SolicitacaoAnalise.
