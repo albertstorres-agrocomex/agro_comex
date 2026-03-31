@@ -137,3 +137,97 @@ class TestPesoSacaKg:
 
     def test_acucar_50kg(self):
         assert PESO_SACA_KG["ACUCAR"] == 50
+
+
+class TestToneladasParaSacas:
+    def test_soja_60_toneladas_igual_1000_sacas(self):
+        from analises.calculators import toneladas_para_sacas
+        assert toneladas_para_sacas(60.0, "SOJA") == 1000
+
+    def test_acucar_50_toneladas_igual_1000_sacas(self):
+        from analises.calculators import toneladas_para_sacas
+        assert toneladas_para_sacas(50.0, "ACUCAR") == 1000
+
+    def test_milho_6_toneladas_igual_100_sacas(self):
+        from analises.calculators import toneladas_para_sacas
+        assert toneladas_para_sacas(6.0, "MILHO") == 100
+
+    def test_commodity_desconhecida_usa_padrao_60kg(self):
+        from analises.calculators import toneladas_para_sacas
+        assert toneladas_para_sacas(6.0, "TRIGO") == 100  # 6000kg / 60kg
+
+    def test_codigo_case_insensitive(self):
+        from analises.calculators import toneladas_para_sacas
+        assert toneladas_para_sacas(60.0, "soja") == 1000
+
+
+class TestExecutarCalculoBs:
+    def _make_solicitacao(self, tipo_nome="call", preco_exercicio=13000, qtd=None):
+        from unittest.mock import MagicMock
+        from datetime import date, timedelta
+        sol = MagicMock()
+        sol.tipo_derivativo.nome = tipo_nome
+        sol.preco_exercicio = preco_exercicio
+        sol.preco_mercado_atual = 13000  # R$130,00
+        sol.quantidade_sacas = qtd
+        sol.mes_contrato.data_vencimento = date.today() + timedelta(days=180)
+        sol.commodity.nome = "Soja"
+        return sol
+
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_retorna_dict_com_chaves_corretas(self, mock_selic, mock_vol):
+        from analises.calculators import executar_calculo_bs
+        mock_selic.return_value = 0.1075
+        mock_vol.return_value = 0.25
+        sol = self._make_solicitacao(tipo_nome="call")
+        resultado = executar_calculo_bs(sol)
+        chaves_esperadas = {
+            "premio_calculado", "percentual_premio", "valor_total_contrato",
+            "lucro_maximo", "volatilidade_utilizada", "taxa_juros_utilizada", "dados_brutos"
+        }
+        assert set(resultado.keys()) == chaves_esperadas
+
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_call_lucro_maximo_e_none(self, mock_selic, mock_vol):
+        from analises.calculators import executar_calculo_bs
+        mock_selic.return_value = 0.1075
+        mock_vol.return_value = 0.25
+        sol = self._make_solicitacao(tipo_nome="call")
+        resultado = executar_calculo_bs(sol)
+        assert resultado["lucro_maximo"] is None
+
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_put_lucro_maximo_e_positivo(self, mock_selic, mock_vol):
+        from analises.calculators import executar_calculo_bs
+        mock_selic.return_value = 0.1075
+        mock_vol.return_value = 0.25
+        sol = self._make_solicitacao(tipo_nome="put", preco_exercicio=14000)  # strike R$140 > preco R$130
+        resultado = executar_calculo_bs(sol)
+        assert resultado["lucro_maximo"] is not None
+        assert resultado["lucro_maximo"] > 0
+
+    def test_tipo_invalido_levanta_value_error(self):
+        from analises.calculators import executar_calculo_bs
+        sol = self._make_solicitacao(tipo_nome="knock_out")
+        with pytest.raises(ValueError, match="nao suportado"):
+            executar_calculo_bs(sol)
+
+    def test_sem_preco_exercicio_levanta_value_error(self):
+        from analises.calculators import executar_calculo_bs
+        sol = self._make_solicitacao(preco_exercicio=None)
+        with pytest.raises(ValueError, match="preco_exercicio"):
+            executar_calculo_bs(sol)
+
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_valor_total_calculado_quando_ha_quantidade(self, mock_selic, mock_vol):
+        from analises.calculators import executar_calculo_bs
+        mock_selic.return_value = 0.1075
+        mock_vol.return_value = 0.25
+        sol = self._make_solicitacao(tipo_nome="call", qtd=1000)
+        resultado = executar_calculo_bs(sol)
+        assert resultado["valor_total_contrato"] is not None
+        assert resultado["valor_total_contrato"] == resultado["premio_calculado"] * 1000
