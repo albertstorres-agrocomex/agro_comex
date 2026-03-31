@@ -114,7 +114,12 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
       return;
     }
     if (!precoExercicio) {
-      setError("Informe o valor do contrato.");
+      setError("Informe o preco de exercicio.");
+      return;
+    }
+    const parsedPreco = parseFloat(precoExercicio);
+    if (isNaN(parsedPreco) || parsedPreco <= 0) {
+      setError("Informe um preco de exercicio valido.");
       return;
     }
     if (!quantidade || !unidadeQuantidade) {
@@ -137,7 +142,7 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
         commodity: Number(commodityId),
         tipo_derivativo: Number(tipoId),
         mes_contrato: Number(mesId),
-        preco_exercicio: Math.round(parseFloat(precoExercicio) * 100),
+        preco_exercicio: Math.round((parsedPreco + Number.EPSILON) * 100),
         quantidade: Number(quantidade),
         unidade_quantidade: unidadeQuantidade as "sacas" | "toneladas",
         posicao: posicao || null,
@@ -244,7 +249,7 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
 
           {/* Valor do contrato */}
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Valor do Contrato</Label>
+            <Label className="text-xs font-semibold">Preco de Exercicio</Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
                 {commodity?.moeda ?? ""}
@@ -255,7 +260,7 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
                 step="0.01"
                 value={precoExercicio}
                 onChange={(e) => setPrecoExercicio(e.target.value)}
-                placeholder="0.00"
+                placeholder="Ex: 450.50"
                 className="h-9 text-sm pl-10"
               />
             </div>
