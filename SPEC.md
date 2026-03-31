@@ -182,7 +182,7 @@ POST /api/v1/solicitacao_analise/
   -> SolicitacaoAnalise criada (status: aguardando)
   -> perform_create() enfileira processar_analise.delay(solicitacao_id)
   -> worker: status = processando
-  -> worker: calcula volatilidade, taxa_juros, nivel_acumulacao
+  -> worker: calcula volatilidade, taxa_juros
   -> worker: salva ResultadoAnalise
   -> worker: status = concluido
   -> em caso de excecao: retry ate 3x, depois status = erro
