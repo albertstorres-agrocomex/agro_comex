@@ -219,6 +219,13 @@ def executar_calculo_bs(solicitacao) -> dict:
     }
 
 
+FATORES_CENARIO: dict[str, float] = {
+    "conservador": 0.90,
+    "moderado":    0.99,
+    "agressivo":   1.07,
+}
+
+
 def recomendar_cenario(cenarios: list[dict], S: float) -> str:
     """
     Retorna o nome do cenario recomendado.
@@ -234,3 +241,58 @@ def recomendar_cenario(cenarios: list[dict], S: float) -> str:
     S_centavos = round(S * 100)
     melhor = min(candidatos, key=lambda c: abs(c["ponto_equilibrio_centavos"] - S_centavos))
     return melhor["nome"]
+
+
+def executar_analise_cenarios(solicitacao) -> list[dict]:
+    """
+    Executa Black-Scholes para 3 cenarios (conservador/moderado/agressivo),
+    gerando strikes automaticamente como fracao do preco de mercado atual.
+    Nao muta o objeto solicitacao original.
+    """
+    from copy import deepcopy
+
+    S_centavos = solicitacao.preco_mercado_atual
+    S = S_centavos / 100.0
+    tipo_nome = solicitacao.tipo_derivativo.nome.lower()
+    posicao = solicitacao.posicao or "comprador"
+
+    cenarios: list[dict] = []
+
+    for nome, fator in FATORES_CENARIO.items():
+        K_centavos = int(S_centavos * fator)
+
+        clone = deepcopy(solicitacao)
+        clone.preco_exercicio = K_centavos
+
+        resultado_bs = executar_calculo_bs(clone)
+
+        K = K_centavos / 100.0
+        premio = resultado_bs["premio_calculado"] / 100.0
+        ponto_equilibrio_centavos = round((K - premio) * 100)
+
+        if fator <= 0.90:
+            nivel_risco = "baixo"
+        elif fator <= 1.00:
+            nivel_risco = "medio"
+        else:
+            nivel_risco = "alto"
+
+        pontos_curva = calcular_curva_resultado(S, K, premio, posicao, tipo_nome)
+
+        cenarios.append({
+            "nome":                       nome,
+            "fator":                      fator,
+            "preco_exercicio_centavos":   K_centavos,
+            "premio_centavos":            resultado_bs["premio_calculado"],
+            "valor_total_centavos":       resultado_bs["valor_total_contrato"] or 0,
+            "ponto_equilibrio_centavos":  ponto_equilibrio_centavos,
+            "nivel_risco":                nivel_risco,
+            "e_recomendado":              False,
+            "pontos_curva":               pontos_curva,
+        })
+
+    nome_recomendado = recomendar_cenario(cenarios, S)
+    for c in cenarios:
+        c["e_recomendado"] = (c["nome"] == nome_recomendado)
+
+    return cenarios
