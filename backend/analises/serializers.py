@@ -1,15 +1,21 @@
 from rest_framework import serializers
 from analises.models import SolicitacaoAnalise, ResultadoAnalise
+from meses_contrato_futuro.models import MesContratoFurturo as MesContratoFurturoModel
 
 
 class SolicitacaoAnaliseCreateSerializer(serializers.ModelSerializer):
     """Usado no POST — aceita IDs das FKs, auto-preenche usuario e preco."""
 
-    quantidade = serializers.IntegerField(write_only=True, required=False, min_value=1)
+    mes_contrato = serializers.PrimaryKeyRelatedField(
+        queryset=MesContratoFurturoModel.objects.filter(ativo=True),
+        required=True,
+    )
+    preco_exercicio = serializers.IntegerField(required=True, min_value=1)
+    quantidade = serializers.IntegerField(write_only=True, required=True, min_value=1)
     unidade_quantidade = serializers.ChoiceField(
         choices=["sacas", "toneladas"],
         write_only=True,
-        required=False,
+        required=True,
     )
 
     class Meta:
@@ -37,17 +43,6 @@ class SolicitacaoAnaliseCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"nivel_barreira": "Este tipo de derivativo requer nivel de barreira."}
                 )
-
-        quantidade = attrs.get("quantidade")
-        unidade = attrs.get("unidade_quantidade")
-        if quantidade is not None and unidade is None:
-            raise serializers.ValidationError(
-                {"unidade_quantidade": "Informe a unidade (sacas ou toneladas) ao fornecer quantidade."}
-            )
-        if unidade is not None and quantidade is None:
-            raise serializers.ValidationError(
-                {"quantidade": "Informe a quantidade ao fornecer a unidade."}
-            )
 
         return attrs
 
