@@ -65,3 +65,49 @@ class ResultadoAnalise(models.Model):
 
     class Meta:
         db_table = "resultados_analise"
+
+
+class CenarioAnalise(models.Model):
+    class NomeCenario(models.TextChoices):
+        CONSERVADOR = "conservador"
+        MODERADO    = "moderado"
+        AGRESSIVO   = "agressivo"
+
+    class NivelRisco(models.TextChoices):
+        BAIXO = "baixo"
+        MEDIO = "medio"
+        ALTO  = "alto"
+
+    resultado                 = models.ForeignKey(
+        ResultadoAnalise,
+        on_delete=models.CASCADE,
+        related_name="cenarios",
+    )
+    nome                      = models.CharField(max_length=20, choices=NomeCenario.choices)
+    fator                     = models.DecimalField(max_digits=4, decimal_places=2)
+    preco_exercicio_centavos  = models.IntegerField()
+    premio_centavos           = models.IntegerField()
+    valor_total_centavos      = models.IntegerField()
+    ponto_equilibrio_centavos = models.IntegerField()
+    nivel_risco               = models.CharField(max_length=10, choices=NivelRisco.choices)
+    e_recomendado             = models.BooleanField(default=False)
+    escolhido_pelo_usuario    = models.BooleanField(default=False)
+    escolhido_em              = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table      = "cenarios_analise"
+        unique_together = [("resultado", "nome")]
+
+
+class PontoCurvaResultado(models.Model):
+    cenario            = models.ForeignKey(
+        CenarioAnalise,
+        on_delete=models.CASCADE,
+        related_name="pontos_curva",
+    )
+    preco_centavos     = models.IntegerField()
+    resultado_centavos = models.IntegerField()
+
+    class Meta:
+        db_table = "pontos_curva_resultado"
+        ordering = ["preco_centavos"]

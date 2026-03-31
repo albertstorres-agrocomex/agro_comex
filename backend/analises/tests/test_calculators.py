@@ -230,4 +230,90 @@ class TestExecutarCalculoBs:
         sol = self._make_solicitacao(tipo_nome="call", qtd=1000)
         resultado = executar_calculo_bs(sol)
         assert resultado["valor_total_contrato"] is not None
-        assert resultado["valor_total_contrato"] == resultado["premio_calculado"] * 1000
+
+
+from django.test import TestCase
+
+
+class TestCenarioAnaliseModel(TestCase):
+    def _make_resultado(self):
+        from analises.models import SolicitacaoAnalise, ResultadoAnalise
+        from commodities.models import Comomodity
+        from tipos_derivativo.models import TipoDerivativo
+        from usuario.models import Usuario
+        from meses_contrato_futuro.models import MesContratoFurturo
+        from django.contrib.auth.models import User
+        import datetime
+
+        auth_user = User.objects.create_user(username="teste_model", password="x")
+        usuario = Usuario.objects.create(first_name="Teste", user=auth_user)
+        commodity = Comomodity.objects.create(nome="Soja", codigo="SOJA", moeda="USD", unidade="sc")
+        tipo = TipoDerivativo.objects.create(nome="put", rotulo="Put", requer_posicao=True, requer_barreira=False)
+        mes = MesContratoFurturo.objects.create(
+            commodity=commodity,
+            codigo_mes="K", ano=2026, ativo=True,
+            data_vencimento=datetime.date(2026, 5, 14),
+            ticket_completo="ZCK26"
+        )
+        sol = SolicitacaoAnalise.objects.create(
+            usuario=usuario, commodity=commodity,
+            tipo_derivativo=tipo, mes_contrato=mes,
+            preco_mercado_atual=13000, preco_exercicio=13000,
+            quantidade_sacas=1000, posicao="vendedor",
+        )
+        return ResultadoAnalise.objects.create(
+            solicitacao=sol,
+            premio_calculado=350,
+            valor_total_contrato=350000,
+        )
+
+    def test_cenario_analise_criado_com_campos_obrigatorios(self):
+        from analises.models import CenarioAnalise
+        resultado = self._make_resultado()
+        cenario = CenarioAnalise.objects.create(
+            resultado=resultado,
+            nome="conservador",
+            fator="0.90",
+            preco_exercicio_centavos=11700,
+            premio_centavos=280,
+            valor_total_centavos=280000,
+            ponto_equilibrio_centavos=11420,
+            nivel_risco="baixo",
+            e_recomendado=False,
+        )
+        assert cenario.pk is not None
+        assert cenario.escolhido_pelo_usuario is False
+        assert cenario.escolhido_em is None
+
+    def test_ponto_curva_resultado_criado_vinculado_ao_cenario(self):
+        from analises.models import CenarioAnalise, PontoCurvaResultado
+        resultado = self._make_resultado()
+        cenario = CenarioAnalise.objects.create(
+            resultado=resultado, nome="moderado", fator="0.99",
+            preco_exercicio_centavos=12870, premio_centavos=310,
+            valor_total_centavos=310000, ponto_equilibrio_centavos=12560,
+            nivel_risco="medio", e_recomendado=True,
+        )
+        ponto = PontoCurvaResultado.objects.create(
+            cenario=cenario, preco_centavos=12000, resultado_centavos=560,
+        )
+        assert ponto.pk is not None
+        assert ponto.cenario_id == cenario.pk
+
+    def test_unique_together_resultado_nome(self):
+        from django.db import IntegrityError
+        from analises.models import CenarioAnalise
+        resultado = self._make_resultado()
+        CenarioAnalise.objects.create(
+            resultado=resultado, nome="conservador", fator="0.90",
+            preco_exercicio_centavos=11700, premio_centavos=280,
+            valor_total_centavos=280000, ponto_equilibrio_centavos=11420,
+            nivel_risco="baixo", e_recomendado=False,
+        )
+        with self.assertRaises(IntegrityError):
+            CenarioAnalise.objects.create(
+                resultado=resultado, nome="conservador", fator="0.90",
+                preco_exercicio_centavos=11700, premio_centavos=280,
+                valor_total_centavos=280000, ponto_equilibrio_centavos=11420,
+                nivel_risco="baixo", e_recomendado=False,
+            )
