@@ -217,3 +217,20 @@ def executar_calculo_bs(solicitacao) -> dict:
             "premio_reais": round(premio_reais, 4),
         },
     }
+
+
+def recomendar_cenario(cenarios: list[dict], S: float) -> str:
+    """
+    Retorna o nome do cenario recomendado.
+    Criterio primario  : maior valor_total_centavos.
+    Criterio secundario: ponto_equilibrio_centavos mais proximo de S (em centavos).
+    """
+    max_total = max(c["valor_total_centavos"] for c in cenarios)
+    candidatos = [c for c in cenarios if c["valor_total_centavos"] == max_total]
+
+    if len(candidatos) == 1:
+        return candidatos[0]["nome"]
+
+    S_centavos = round(S * 100)
+    melhor = min(candidatos, key=lambda c: abs(c["ponto_equilibrio_centavos"] - S_centavos))
+    return melhor["nome"]

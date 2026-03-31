@@ -371,3 +371,47 @@ class TestCalcularCurvaResultado:
         from analises.calculators import calcular_curva_resultado
         pontos = calcular_curva_resultado(S=130.0, K=117.0, premio=2.80, posicao="vendedor", tipo="put")
         assert pontos[-1]["preco_centavos"] == round(130.0 * 1.5 * 100)
+
+
+class TestRecomendarCenario:
+    def _cenarios_base(self):
+        return [
+            {
+                "nome": "conservador",
+                "valor_total_centavos": 280000,
+                "ponto_equilibrio_centavos": 11420,
+            },
+            {
+                "nome": "moderado",
+                "valor_total_centavos": 310000,
+                "ponto_equilibrio_centavos": 12560,
+            },
+            {
+                "nome": "agressivo",
+                "valor_total_centavos": 290000,
+                "ponto_equilibrio_centavos": 13910,
+            },
+        ]
+
+    def test_recomenda_maior_valor_total(self):
+        from analises.calculators import recomendar_cenario
+        cenarios = self._cenarios_base()
+        # moderado tem maior valor_total_centavos
+        assert recomendar_cenario(cenarios, S=130.0) == "moderado"
+
+    def test_empate_valor_total_desempata_por_ponto_equilibrio_mais_proximo_de_S(self):
+        from analises.calculators import recomendar_cenario
+        cenarios = [
+            {"nome": "conservador", "valor_total_centavos": 310000, "ponto_equilibrio_centavos": 11420},
+            {"nome": "moderado",    "valor_total_centavos": 310000, "ponto_equilibrio_centavos": 12900},
+            {"nome": "agressivo",   "valor_total_centavos": 290000, "ponto_equilibrio_centavos": 13910},
+        ]
+        # S = 130.0 -> 13000 centavos. Moderado tem ponto_equilibrio 12900 (distancia 100)
+        # Conservador tem ponto_equilibrio 11420 (distancia 1580). Moderado vence.
+        assert recomendar_cenario(cenarios, S=130.0) == "moderado"
+
+    def test_retorna_string_com_nome_do_cenario(self):
+        from analises.calculators import recomendar_cenario
+        resultado = recomendar_cenario(self._cenarios_base(), S=130.0)
+        assert isinstance(resultado, str)
+        assert resultado in ("conservador", "moderado", "agressivo")
