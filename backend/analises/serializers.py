@@ -58,15 +58,13 @@ class SolicitacaoAnaliseCreateSerializer(serializers.ModelSerializer):
         if tipo.posicao_implicita and not validated_data.get("posicao"):
             validated_data["posicao"] = tipo.posicao_implicita
 
-        quantidade = validated_data.pop("quantidade", None)
-        unidade = validated_data.pop("unidade_quantidade", None)
+        quantidade = validated_data.pop("quantidade")
+        unidade = validated_data.pop("unidade_quantidade")
 
-        quantidade_sacas = None
-        if quantidade is not None and unidade is not None:
-            if unidade == "sacas":
-                quantidade_sacas = quantidade
-            elif unidade == "toneladas":
-                quantidade_sacas = toneladas_para_sacas(quantidade, commodity.codigo)
+        if unidade == "sacas":
+            quantidade_sacas = quantidade
+        else:
+            quantidade_sacas = toneladas_para_sacas(quantidade, commodity.codigo)
 
         # Filtrar apenas fontes de preco unitario — COMEXSTAT_EXPORT reside em ExportacaoMensal
         ultimo = (
