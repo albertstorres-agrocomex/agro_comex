@@ -299,6 +299,57 @@ Configuradas via migration `dados/0002_periodic_tasks.py`. Todas ativas por padr
 
 ---
 
+## Precificacao de Opcoes — Black-Scholes
+
+### Algoritmo utilizado
+
+O sistema utiliza o modelo Black-Scholes para precificacao de opcoes europeias (exercicio apenas no vencimento). A implementacao vive em `backend/analises/calculators.py` e usa exclusivamente a stdlib Python (`math`, `decimal`, `datetime`) — sem dependencias externas.
+
+### Parametros de entrada
+
+| Parametro | Origem | Campo no modelo |
+|-----------|--------|-----------------|
+| S — preco atual do ativo | Ultimo preco em `CacheDadosMercado` | `SolicitacaoAnalise.preco_mercado_atual` |
+| K — strike / preco de exercicio | Informado pelo usuario | `SolicitacaoAnalise.preco_exercicio` |
+| T — tempo ate vencimento (anos) | Calculado de `MesContratoFurturo.data_vencimento` | — |
+| r — taxa livre de risco | SELIC mais recente em `DadosMacroeconomicos` | — |
+| sigma — volatilidade anualizada | Desvio padrao dos retornos log dos ultimos 252 pregoes em `CacheDadosMercado` | — |
+
+### Saidas calculadas
+
+| Campo | Formula |
+|-------|---------|
+| `premio_calculado` | Black-Scholes C (call) ou P (put), convertido para centavos |
+| `percentual_premio` | `premio / preco_atual * 100` |
+| `valor_total_contrato` | `premio_centavos * quantidade_sacas` |
+| `lucro_maximo` | `max(0, K - premio) * quantidade_sacas` — apenas para put; null para call |
+
+### Tipos de derivativo suportados
+
+| Tipo | Suportado |
+|------|-----------|
+| `call` | Sim |
+| `put` | Sim |
+| `knock_out` | Nao — retorna status `erro` com mensagem explicativa |
+| `knock_in` | Nao — retorna status `erro` com mensagem explicativa |
+
+### Conversao de unidade no input
+
+O usuario pode informar quantidade em sacas ou toneladas. A conversao e feita no serializer via `toneladas_para_sacas()` em `calculators.py`.
+
+| Commodity | Peso por saca |
+|-----------|--------------|
+| SOJA      | 60 kg        |
+| MILHO     | 60 kg        |
+| CAFE      | 60 kg        |
+| ACUCAR    | 50 kg        |
+
+### Auditoria
+
+Os valores intermediarios (d1, d2, S, K, T, r, sigma, premio_reais) sao armazenados em `ResultadoAnalise.dados_brutos` (JSONField) para cada analise calculada.
+
+---
+
 ## Typos nos nomes de modelos (pendente correcao futura)
 
 | Local | Nome atual | Nome correto |

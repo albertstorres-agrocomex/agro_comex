@@ -130,6 +130,8 @@ Unique: `(commodity, data_preco, fonte)`. Possivel exclusao futura.
 | preco_mercado_atual | IntegerField | |
 | posicao | CharField(12) | nullable — obrigatorio se requer_posicao |
 | nivel_barreira | IntegerField | nullable — obrigatorio se requer_barreira |
+| preco_exercicio   | IntegerField (null)  | Strike da opcao em centavos (obrigatorio para calculo B-S)   |
+| quantidade_sacas  | IntegerField (null)  | Volume do contrato em numero de sacas (opcional)              |
 | status | CharField | choices: aguardanto / processando / concluido / erro |
 | id_tarefa_worker | CharField(100) | nullable — ID Celery |
 | criado_em | DateTimeField | auto_now_add |
@@ -140,10 +142,13 @@ Regra de validacao: `posicao` e `nivel_barreira` sao obrigatorios se o `TipoDeri
 | Campo | Tipo | Obs |
 |---|---|---|
 | solicitacao | ForeignKey (SolicitacaoAnalise) | CASCADE |
-| nivel_acumulacao | IntegerField | nullable |
-| volatilidade_utilizada | DecimalField(8, 6) | nullable |
-| taxa_juros_utilizada | DecimalField(8, 6) | nullable |
-| dados_brutos | JSONField | nullable |
+| premio_calculado      | IntegerField (null)         | Preco da opcao calculado pelo Black-Scholes, em centavos     |
+| percentual_premio     | DecimalField(8,4) (null)    | Premio como percentual do preco de mercado atual             |
+| valor_total_contrato  | IntegerField (null)         | Premio multiplicado pela quantidade de sacas, em centavos    |
+| lucro_maximo          | IntegerField (null)         | (strike - premio) * qtd para put; null para call             |
+| volatilidade_utilizada| DecimalField(8,6) (null)    | Volatilidade historica anualizada (ultimos 252 pregoes)      |
+| taxa_juros_utilizada  | DecimalField(8,6) (null)    | Taxa SELIC anual em decimal (ex: 0.1075 para 10,75%)        |
+| dados_brutos          | JSONField (null)             | Parametros intermediarios: d1, d2, S, K, T, r, sigma        |
 | calculado_em | DateTimeField | auto_now_add |
 
 ### Endpoints REST
