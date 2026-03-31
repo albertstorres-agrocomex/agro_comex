@@ -77,7 +77,10 @@ export interface MesContrato {
 export interface SolicitacaoCreatePayload {
   commodity: number;
   tipo_derivativo: number;
-  mes_contrato?: number | null;
+  mes_contrato: number;
+  preco_exercicio: number;
+  quantidade: number;
+  unidade_quantidade: "sacas" | "toneladas";
   posicao?: "comprador" | "vendedor" | null;
   nivel_barreira?: number | null;
 }
