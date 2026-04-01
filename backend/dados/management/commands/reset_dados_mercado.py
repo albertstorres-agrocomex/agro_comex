@@ -4,10 +4,10 @@ from django.db import connection
 
 TABELAS_ORDENADAS = [
     # Ordem respeita FKs: filhos antes dos pais
-    "analises_pontocurvaresultado",
-    "analises_cenarioanalise",
-    "analises_resultadoanalise",
-    "analises_solicitacaoanalise",
+    "pontos_curva_resultado",
+    "cenarios_analise",
+    "resultados_analise",
+    "solicitacoes_analise",
     "cache_dados_mercado",
     "dados_macroeconomicos",
     "exportacao_mensal",
