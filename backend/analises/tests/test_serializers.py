@@ -54,10 +54,9 @@ class TestCenarioAnaliseSerializer(TestCase):
             solicitacao=sol, premio_calculado=350, valor_total_contrato=350000,
         )
         cenario = CenarioAnalise.objects.create(
-            resultado=resultado, nome="moderado", fator="0.99",
+            resultado=resultado, nome="moderado",
             preco_exercicio_centavos=12870, premio_centavos=310,
-            valor_total_centavos=310000, ponto_equilibrio_centavos=12560,
-            nivel_risco="medio", e_recomendado=True,
+            e_recomendado=True,
         )
         PontoCurvaResultado.objects.create(
             cenario=cenario, preco_centavos=12000, resultado_centavos=560,

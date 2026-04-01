@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 
 from analises.models import SolicitacaoAnalise, ResultadoAnalise, CenarioAnalise
 from analises.serializers import (
@@ -26,7 +26,7 @@ class SolicitacaoAnaliseListCreateView(APIView):
         perfil = request.user.usuarios
         qs = SolicitacaoAnalise.objects.filter(usuario=perfil).select_related(
             "commodity", "tipo_derivativo", "mes_contrato"
-        )
+        ).order_by("-criado_em")
         status_filter = request.query_params.get("status")
         if status_filter and status_filter != "todos":
             qs = qs.filter(status=status_filter)
@@ -82,6 +82,14 @@ class SolicitacaoAnaliseDetailView(APIView):
         if obj.status in (SolicitacaoAnalise.Status.CONCLUIDO, SolicitacaoAnalise.Status.APROVADO):
             resultado = (
                 ResultadoAnalise.objects.filter(solicitacao=obj)
+                .prefetch_related(
+                    Prefetch(
+                        "cenarios",
+                        queryset=CenarioAnalise.objects.select_related(
+                            "resultado__solicitacao"
+                        ).prefetch_related("pontos_curva"),
+                    )
+                )
                 .order_by("-calculado_em")
                 .first()
             )
@@ -118,6 +126,14 @@ class SolicitacaoAnaliseDetailView(APIView):
         if obj.status == SolicitacaoAnalise.Status.APROVADO:
             resultado = (
                 ResultadoAnalise.objects.filter(solicitacao=obj)
+                .prefetch_related(
+                    Prefetch(
+                        "cenarios",
+                        queryset=CenarioAnalise.objects.select_related(
+                            "resultado__solicitacao"
+                        ).prefetch_related("pontos_curva"),
+                    )
+                )
                 .order_by("-calculado_em")
                 .first()
             )

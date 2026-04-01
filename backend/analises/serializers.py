@@ -158,11 +158,17 @@ class PontoCurvaResultadoSerializer(serializers.ModelSerializer):
         fields = ["preco", "resultado"]
 
 
+_FATORES_CENARIO = {"conservador": "0.90", "moderado": "0.99", "agressivo": "1.07"}
+_NIVEL_RISCO_CENARIO = {"conservador": "baixo", "moderado": "medio", "agressivo": "alto"}
+
+
 class CenarioAnaliseSerializer(serializers.ModelSerializer):
     preco_exercicio  = serializers.SerializerMethodField()
     premio           = serializers.SerializerMethodField()
     valor_total      = serializers.SerializerMethodField()
     ponto_equilibrio = serializers.SerializerMethodField()
+    fator            = serializers.SerializerMethodField()
+    nivel_risco      = serializers.SerializerMethodField()
     pontos_curva     = PontoCurvaResultadoSerializer(many=True, read_only=True)
 
     def get_preco_exercicio(self, obj):
@@ -172,10 +178,19 @@ class CenarioAnaliseSerializer(serializers.ModelSerializer):
         return round(obj.premio_centavos / 100, 2)
 
     def get_valor_total(self, obj):
-        return round(obj.valor_total_centavos / 100, 2)
+        qtd = obj.resultado.solicitacao.quantidade_sacas
+        if qtd is None:
+            return None
+        return round(obj.premio_centavos * qtd / 100, 2)
 
     def get_ponto_equilibrio(self, obj):
-        return round(obj.ponto_equilibrio_centavos / 100, 2)
+        return round((obj.preco_exercicio_centavos - obj.premio_centavos) / 100, 2)
+
+    def get_fator(self, obj):
+        return _FATORES_CENARIO.get(obj.nome)
+
+    def get_nivel_risco(self, obj):
+        return _NIVEL_RISCO_CENARIO.get(obj.nome)
 
     class Meta:
         model  = CenarioAnalise
@@ -219,7 +234,8 @@ class ResultadoAnaliseSerializer(serializers.ModelSerializer):
             "lucro_maximo",
             "volatilidade_utilizada",
             "taxa_juros_utilizada",
-            "dados_brutos",
+            "d1",
+            "d2",
             "calculado_em",
             "cenarios",
         ]

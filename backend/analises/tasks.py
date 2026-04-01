@@ -40,7 +40,8 @@ def processar_analise(self, solicitacao_id: int) -> dict:
             lucro_maximo=resultado["lucro_maximo"],
             volatilidade_utilizada=resultado["volatilidade_utilizada"],
             taxa_juros_utilizada=resultado["taxa_juros_utilizada"],
-            dados_brutos=resultado["dados_brutos"],
+            d1=resultado["d1"],
+            d2=resultado["d2"],
         )
 
         # motor de cenarios

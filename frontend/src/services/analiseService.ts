@@ -31,13 +31,34 @@ export interface SolicitacaoAnaliseData {
   resultado?: ResultadoAnaliseData;
 }
 
+export interface CenarioAnaliseData {
+  id: number;
+  nome: "conservador" | "moderado" | "agressivo";
+  fator: string | null;
+  preco_exercicio: number;
+  premio: number;
+  valor_total: number | null;
+  ponto_equilibrio: number;
+  nivel_risco: "baixo" | "medio" | "alto" | null;
+  e_recomendado: boolean;
+  escolhido_pelo_usuario: boolean;
+  escolhido_em: string | null;
+  pontos_curva: { preco: number; resultado: number }[];
+}
+
 export interface ResultadoAnaliseData {
   id: number;
-  nivel_acumulacao: number | null;
+  solicitacao: number;
+  premio_calculado: number | null;
+  percentual_premio: string | null;
+  valor_total_contrato: number | null;
+  lucro_maximo: number | null;
   volatilidade_utilizada: string | null;
   taxa_juros_utilizada: string | null;
-  dados_brutos: Record<string, unknown> | null;
+  d1: string | null;
+  d2: string | null;
   calculado_em: string;
+  cenarios: CenarioAnaliseData[];
 }
 
 export interface SolicitacaoPaginatedResponse {

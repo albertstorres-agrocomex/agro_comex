@@ -205,17 +205,8 @@ def executar_calculo_bs(solicitacao) -> dict:
         "lucro_maximo":           lucro_maximo,
         "volatilidade_utilizada": Decimal(str(round(sigma, 6))),
         "taxa_juros_utilizada":   Decimal(str(round(r, 6))),
-        "dados_brutos": {
-            "tipo":         tipo_nome,
-            "S":            S,
-            "K":            K,
-            "T":            round(T, 6),
-            "r":            round(r, 6),
-            "sigma":        round(sigma, 6),
-            "d1":           round(d1, 6) if d1 is not None else None,
-            "d2":           round(d2, 6) if d2 is not None else None,
-            "premio_reais": round(premio_reais, 4),
-        },
+        "d1":                     Decimal(str(round(d1, 6))) if d1 is not None else None,
+        "d2":                     Decimal(str(round(d2, 6))) if d2 is not None else None,
     }
 
 
@@ -229,17 +220,20 @@ FATORES_CENARIO: dict[str, float] = {
 def recomendar_cenario(cenarios: list[dict], S: float) -> str:
     """
     Retorna o nome do cenario recomendado.
-    Criterio primario  : maior valor_total_centavos.
-    Criterio secundario: ponto_equilibrio_centavos mais proximo de S (em centavos).
+    Criterio primario  : maior premio_centavos (equivalente a maior valor total, pois quantidade e constante).
+    Criterio secundario: ponto de equilibrio (preco_exercicio - premio) mais proximo de S.
     """
-    max_total = max(c["valor_total_centavos"] for c in cenarios)
-    candidatos = [c for c in cenarios if c["valor_total_centavos"] == max_total]
+    max_premio = max(c["premio_centavos"] for c in cenarios)
+    candidatos = [c for c in cenarios if c["premio_centavos"] == max_premio]
 
     if len(candidatos) == 1:
         return candidatos[0]["nome"]
 
     S_centavos = round(S * 100)
-    melhor = min(candidatos, key=lambda c: abs(c["ponto_equilibrio_centavos"] - S_centavos))
+    melhor = min(
+        candidatos,
+        key=lambda c: abs((c["preco_exercicio_centavos"] - c["premio_centavos"]) - S_centavos),
+    )
     return melhor["nome"]
 
 
@@ -268,27 +262,14 @@ def executar_analise_cenarios(solicitacao) -> list[dict]:
 
         K = K_centavos / 100.0
         premio = resultado_bs["premio_calculado"] / 100.0
-        ponto_equilibrio_centavos = round((K - premio) * 100)
-
-        if fator <= 0.90:
-            nivel_risco = "baixo"
-        elif fator <= 1.00:
-            nivel_risco = "medio"
-        else:
-            nivel_risco = "alto"
-
         pontos_curva = calcular_curva_resultado(S, K, premio, posicao, tipo_nome)
 
         cenarios.append({
-            "nome":                       nome,
-            "fator":                      fator,
-            "preco_exercicio_centavos":   K_centavos,
-            "premio_centavos":            resultado_bs["premio_calculado"],
-            "valor_total_centavos":       resultado_bs["valor_total_contrato"] or 0,
-            "ponto_equilibrio_centavos":  ponto_equilibrio_centavos,
-            "nivel_risco":                nivel_risco,
-            "e_recomendado":              False,
-            "pontos_curva":               pontos_curva,
+            "nome":                     nome,
+            "preco_exercicio_centavos": K_centavos,
+            "premio_centavos":          resultado_bs["premio_calculado"],
+            "e_recomendado":            False,
+            "pontos_curva":             pontos_curva,
         })
 
     nome_recomendado = recomendar_cenario(cenarios, S)

@@ -38,22 +38,19 @@ class TestEscolherCenarioView(TestCase):
             solicitacao=self.sol, premio_calculado=350, valor_total_contrato=350000,
         )
         self.cenario_conservador = CenarioAnalise.objects.create(
-            resultado=self.resultado, nome="conservador", fator="0.90",
+            resultado=self.resultado, nome="conservador",
             preco_exercicio_centavos=11700, premio_centavos=280,
-            valor_total_centavos=280000, ponto_equilibrio_centavos=11420,
-            nivel_risco="baixo", e_recomendado=False,
+            e_recomendado=False,
         )
         self.cenario_moderado = CenarioAnalise.objects.create(
-            resultado=self.resultado, nome="moderado", fator="0.99",
+            resultado=self.resultado, nome="moderado",
             preco_exercicio_centavos=12870, premio_centavos=310,
-            valor_total_centavos=310000, ponto_equilibrio_centavos=12560,
-            nivel_risco="medio", e_recomendado=True,
+            e_recomendado=True,
         )
         self.cenario_agressivo = CenarioAnalise.objects.create(
-            resultado=self.resultado, nome="agressivo", fator="1.07",
+            resultado=self.resultado, nome="agressivo",
             preco_exercicio_centavos=13910, premio_centavos=290,
-            valor_total_centavos=290000, ponto_equilibrio_centavos=13620,
-            nivel_risco="alto", e_recomendado=False,
+            e_recomendado=False,
         )
         self.client = APIClient()
         self.client.force_authenticate(user=self.auth_user)

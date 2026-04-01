@@ -184,7 +184,7 @@ class TestExecutarCalculoBs:
         resultado = executar_calculo_bs(sol)
         chaves_esperadas = {
             "premio_calculado", "percentual_premio", "valor_total_contrato",
-            "lucro_maximo", "volatilidade_utilizada", "taxa_juros_utilizada", "dados_brutos"
+            "lucro_maximo", "volatilidade_utilizada", "taxa_juros_utilizada", "d1", "d2"
         }
         assert set(resultado.keys()) == chaves_esperadas
 
@@ -273,12 +273,8 @@ class TestCenarioAnaliseModel(TestCase):
         cenario = CenarioAnalise.objects.create(
             resultado=resultado,
             nome="conservador",
-            fator="0.90",
             preco_exercicio_centavos=11700,
             premio_centavos=280,
-            valor_total_centavos=280000,
-            ponto_equilibrio_centavos=11420,
-            nivel_risco="baixo",
             e_recomendado=False,
         )
         assert cenario.pk is not None
@@ -289,10 +285,9 @@ class TestCenarioAnaliseModel(TestCase):
         from analises.models import CenarioAnalise, PontoCurvaResultado
         resultado = self._make_resultado()
         cenario = CenarioAnalise.objects.create(
-            resultado=resultado, nome="moderado", fator="0.99",
+            resultado=resultado, nome="moderado",
             preco_exercicio_centavos=12870, premio_centavos=310,
-            valor_total_centavos=310000, ponto_equilibrio_centavos=12560,
-            nivel_risco="medio", e_recomendado=True,
+            e_recomendado=True,
         )
         ponto = PontoCurvaResultado.objects.create(
             cenario=cenario, preco_centavos=12000, resultado_centavos=560,
@@ -305,17 +300,15 @@ class TestCenarioAnaliseModel(TestCase):
         from analises.models import CenarioAnalise
         resultado = self._make_resultado()
         CenarioAnalise.objects.create(
-            resultado=resultado, nome="conservador", fator="0.90",
+            resultado=resultado, nome="conservador",
             preco_exercicio_centavos=11700, premio_centavos=280,
-            valor_total_centavos=280000, ponto_equilibrio_centavos=11420,
-            nivel_risco="baixo", e_recomendado=False,
+            e_recomendado=False,
         )
         with self.assertRaises(IntegrityError):
             CenarioAnalise.objects.create(
-                resultado=resultado, nome="conservador", fator="0.90",
+                resultado=resultado, nome="conservador",
                 preco_exercicio_centavos=11700, premio_centavos=280,
-                valor_total_centavos=280000, ponto_equilibrio_centavos=11420,
-                nivel_risco="baixo", e_recomendado=False,
+                e_recomendado=False,
             )
 
 
@@ -376,38 +369,25 @@ class TestCalcularCurvaResultado:
 class TestRecomendarCenario:
     def _cenarios_base(self):
         return [
-            {
-                "nome": "conservador",
-                "valor_total_centavos": 280000,
-                "ponto_equilibrio_centavos": 11420,
-            },
-            {
-                "nome": "moderado",
-                "valor_total_centavos": 310000,
-                "ponto_equilibrio_centavos": 12560,
-            },
-            {
-                "nome": "agressivo",
-                "valor_total_centavos": 290000,
-                "ponto_equilibrio_centavos": 13910,
-            },
+            {"nome": "conservador", "premio_centavos": 280, "preco_exercicio_centavos": 11700},
+            {"nome": "moderado",    "premio_centavos": 310, "preco_exercicio_centavos": 12870},
+            {"nome": "agressivo",   "premio_centavos": 290, "preco_exercicio_centavos": 14200},
         ]
 
-    def test_recomenda_maior_valor_total(self):
+    def test_recomenda_maior_premio(self):
         from analises.calculators import recomendar_cenario
         cenarios = self._cenarios_base()
-        # moderado tem maior valor_total_centavos
+        # moderado tem maior premio_centavos
         assert recomendar_cenario(cenarios, S=130.0) == "moderado"
 
-    def test_empate_valor_total_desempata_por_ponto_equilibrio_mais_proximo_de_S(self):
+    def test_empate_premio_desempata_por_ponto_equilibrio_mais_proximo_de_S(self):
         from analises.calculators import recomendar_cenario
         cenarios = [
-            {"nome": "conservador", "valor_total_centavos": 310000, "ponto_equilibrio_centavos": 11420},
-            {"nome": "moderado",    "valor_total_centavos": 310000, "ponto_equilibrio_centavos": 12900},
-            {"nome": "agressivo",   "valor_total_centavos": 290000, "ponto_equilibrio_centavos": 13910},
+            {"nome": "conservador", "premio_centavos": 310, "preco_exercicio_centavos": 11730},
+            {"nome": "moderado",    "premio_centavos": 310, "preco_exercicio_centavos": 13210},
+            {"nome": "agressivo",   "premio_centavos": 290, "preco_exercicio_centavos": 14200},
         ]
-        # S = 130.0 -> 13000 centavos. Moderado tem ponto_equilibrio 12900 (distancia 100)
-        # Conservador tem ponto_equilibrio 11420 (distancia 1580). Moderado vence.
+        # S = 130.0 -> 13000 centavos. Moderado: ponto=12900 (dist 100). Conservador: ponto=11420 (dist 1580).
         assert recomendar_cenario(cenarios, S=130.0) == "moderado"
 
     def test_retorna_string_com_nome_do_cenario(self):
@@ -519,9 +499,8 @@ class TestExecutarAnaliseCenarios:
         sol = self._make_solicitacao()
         resultado = executar_analise_cenarios(sol)
         chaves_esperadas = {
-            "nome", "fator", "preco_exercicio_centavos", "premio_centavos",
-            "valor_total_centavos", "ponto_equilibrio_centavos",
-            "nivel_risco", "e_recomendado", "pontos_curva",
+            "nome", "preco_exercicio_centavos", "premio_centavos",
+            "e_recomendado", "pontos_curva",
         }
         for cenario in resultado:
             assert chaves_esperadas.issubset(cenario.keys())
