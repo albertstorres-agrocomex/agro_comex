@@ -2,6 +2,13 @@ from django.db import models
 from commodities.models import Comomodity
 
 
+QUALIDADE_CHOICES = [
+    ("OK",       "OK"),
+    ("SUSPEITO", "SUSPEITO"),
+    ("INVALIDO", "INVALIDO"),
+]
+
+
 # Utilidade da tebela é garantir uma série histórica local, para calcular a volatilidade com dados do próprio sistema. Possivel exclusão no futuro.
 class CacheDadosMercado(models.Model):
     commodity = models.ForeignKey(
@@ -11,6 +18,12 @@ class CacheDadosMercado(models.Model):
     data_preco = models.DateField()
     preco_fechamento = models.BigIntegerField()
     fonte = models.CharField(max_length=50, null=True, blank=True)
+    qualidade        = models.CharField(
+        max_length=10, choices=QUALIDADE_CHOICES, default="OK"
+    )
+    motivo_qualidade = models.TextField(null=True, blank=True)
+    justificado      = models.BooleanField(default=False)
+    justificativa    = models.TextField(null=True, blank=True)
     obtido_em = models.DateTimeField(auto_now_add=True)
 
 
@@ -41,6 +54,12 @@ class DadosMacroeconomicos(models.Model):
     data       = models.DateField()
     valor      = models.DecimalField(max_digits=18, decimal_places=6)
     fonte      = models.CharField(max_length=50)
+    qualidade        = models.CharField(
+        max_length=10, choices=QUALIDADE_CHOICES, default="OK"
+    )
+    motivo_qualidade = models.TextField(null=True, blank=True)
+    justificado      = models.BooleanField(default=False)
+    justificativa    = models.TextField(null=True, blank=True)
     obtido_em  = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -66,6 +85,12 @@ class ExportacaoMensal(models.Model):
     data_referencia = models.DateField()
     valor_fob_usd = models.BigIntegerField()
     fonte = models.CharField(max_length=50, choices=FONTES)
+    qualidade        = models.CharField(
+        max_length=10, choices=QUALIDADE_CHOICES, default="OK"
+    )
+    motivo_qualidade = models.TextField(null=True, blank=True)
+    justificado      = models.BooleanField(default=False)
+    justificativa    = models.TextField(null=True, blank=True)
     obtido_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
