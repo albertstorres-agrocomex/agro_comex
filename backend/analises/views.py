@@ -5,11 +5,12 @@ from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Count, Q
 
-from analises.models import SolicitacaoAnalise, ResultadoAnalise
+from analises.models import SolicitacaoAnalise, ResultadoAnalise, CenarioAnalise
 from analises.serializers import (
     SolicitacaoAnaliseCreateSerializer,
     SolicitacaoAnaliseReadSerializer,
     ResultadoAnaliseSerializer,
+    CenarioAnaliseSerializer,
 )
 
 
@@ -138,3 +139,37 @@ class SolicitacaoAnaliseStatusCountView(APIView):
         )
         counts["total"] = sum(counts.values())
         return Response(counts)
+
+
+class EscolherCenarioView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        from django.utils import timezone
+
+        perfil = request.user.usuarios
+        try:
+            cenario = CenarioAnalise.objects.select_related(
+                "resultado__solicitacao__usuario"
+            ).get(pk=pk)
+        except CenarioAnalise.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if cenario.resultado.solicitacao.usuario != perfil:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        if request.data.get("escolhido_pelo_usuario") is not True:
+            return Response(
+                {"detail": "Apenas {'escolhido_pelo_usuario': true} e aceito."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        CenarioAnalise.objects.filter(
+            resultado=cenario.resultado
+        ).exclude(pk=pk).update(escolhido_pelo_usuario=False, escolhido_em=None)
+
+        cenario.escolhido_pelo_usuario = True
+        cenario.escolhido_em = timezone.now()
+        cenario.save(update_fields=["escolhido_pelo_usuario", "escolhido_em"])
+
+        return Response(CenarioAnaliseSerializer(cenario).data)
