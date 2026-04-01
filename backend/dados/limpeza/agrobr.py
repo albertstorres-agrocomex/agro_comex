@@ -2,6 +2,8 @@ from datetime import date
 
 import pandas as pd
 
+from dados.limpeza.conversao import converter_b3, converter_cepea
+
 # ---------------------------------------------------------------------------
 # Mapeamento central: nome usado nas fontes externas -> codigo Comomodity no banco
 # Fontes: CEPEA usa "soja"/"milho"/"cafe"; B3 usa "soja_fob"/"milho" etc.;
@@ -27,7 +29,7 @@ def _to_date(valor) -> date:
     return date.fromisoformat(str(valor))
 
 
-def normalizar_futuros_b3(df: pd.DataFrame, contrato: str, fonte: str) -> list[dict]:
+def normalizar_futuros_b3(df: pd.DataFrame, contrato: str, fonte: str, usd_brl: float | None = None) -> list[dict]:
     """
     Normaliza DataFrame de ajustes diarios da B3 (agrobr.b3.historico).
 
@@ -60,10 +62,12 @@ def normalizar_futuros_b3(df: pd.DataFrame, contrato: str, fonte: str) -> list[d
 
     for _, row in df.iterrows():
         try:
+            preco_raw = float(row[COLUNA_PRECO])
+            preco_usd = converter_b3(codigo, preco_raw, usd_brl)
             registros.append({
                 "codigo_commodity": codigo,
                 "data_preco":       _to_date(row[COLUNA_DATA]),
-                "preco_fechamento": int(round(float(row[COLUNA_PRECO]) * 100)),
+                "preco_fechamento": int(round(preco_usd * 100)),
                 "fonte":            fonte,
             })
         except (ValueError, TypeError, KeyError):
@@ -72,18 +76,19 @@ def normalizar_futuros_b3(df: pd.DataFrame, contrato: str, fonte: str) -> list[d
     return registros
 
 
-def normalizar_precos_cepea(df: pd.DataFrame, commodity: str, fonte: str) -> list[dict]:
+def normalizar_precos_cepea(df: pd.DataFrame, commodity: str, fonte: str, usd_brl: float | None = None) -> list[dict]:
     """
     Normaliza DataFrame de precos spot do CEPEA (agrobr.datasets.preco_diario).
 
-    Schema real do agrobr (contracts/cepea.py):
-      data, preco  (apos limpeza pela lib)
+    Schema real do agrobr (contracts/cepea.py — CEPEA_INDICADOR_V1):
+      data, valor  (coluna de preco e "valor", nao "preco")
 
     Commodities suportadas pelo CEPEA via agrobr: soja, milho, boi, cafe,
     trigo, algodao. Acucar NAO e suportado — a task deve omiti-lo da lista.
+    Requer usd_brl para converter BRL/saca para USD/unidade padrao.
     """
     COLUNA_DATA  = "data"
-    COLUNA_PRECO = "preco"
+    COLUNA_PRECO = "valor"
 
     codigo = COMMODITY_NOME_PARA_CODIGO.get(commodity)
     if codigo is None:
@@ -106,10 +111,12 @@ def normalizar_precos_cepea(df: pd.DataFrame, commodity: str, fonte: str) -> lis
 
     for _, row in df.iterrows():
         try:
+            preco_brl = float(row[COLUNA_PRECO])
+            preco_usd = converter_cepea(codigo, preco_brl, usd_brl)
             registros.append({
                 "codigo_commodity": codigo,
                 "data_preco":       _to_date(row[COLUNA_DATA]),
-                "preco_fechamento": int(round(float(row[COLUNA_PRECO]) * 100)),
+                "preco_fechamento": int(round(preco_usd * 100)),
                 "fonte":            fonte,
             })
         except (ValueError, TypeError, KeyError):

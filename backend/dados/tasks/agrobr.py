@@ -16,10 +16,17 @@ def atualizar_futuros_b3(self):
     """
     from agrobr import b3
     from dados.limpeza.agrobr import normalizar_futuros_b3
+    from dados.limpeza.conversao import obter_taxa_usd_brl
     from dados.servicos import persistir_cache_dados_mercado
 
     hoje = date.today()
     contratos = b3.contratos()
+
+    try:
+        usd_brl = obter_taxa_usd_brl()
+    except ValueError as exc:
+        logger.warning("Taxa USD/BRL indisponivel — contratos em BRL (ZC/CCM) serao ignorados: %s", exc)
+        usd_brl = None
 
     todos_registros = []
     for contrato in contratos:
@@ -33,7 +40,7 @@ def atualizar_futuros_b3(self):
             )
             todos_registros.extend(
                 normalizar_futuros_b3(df, contrato=contrato,
-                fonte="B3_FUTUROS")
+                fonte="B3_FUTUROS", usd_brl=usd_brl)
             )
         except Exception as exc:
             logger.warning("Erro ao buscar futuros B3 contrato '%s': %s",
@@ -58,11 +65,18 @@ def atualizar_precos_cepea(self):
     """
     from agrobr import datasets
     from dados.limpeza.agrobr import normalizar_precos_cepea
+    from dados.limpeza.conversao import obter_taxa_usd_brl
     from dados.servicos import persistir_cache_dados_mercado
 
     # Acucar NAO e suportado pelo CEPEA via agrobr
     # (validos: soja, milho, boi, cafe, trigo, algodao)
     COMMODITIES_CEPEA = ["soja", "milho", "cafe"]
+
+    try:
+        usd_brl = obter_taxa_usd_brl()
+    except ValueError as exc:
+        logger.error("Taxa USD/BRL indisponivel — ingestao CEPEA abortada: %s", exc)
+        return {"fonte": "CEPEA_SPOT", "registros": 0, "erro": str(exc)}
 
     todos_registros = []
     for commodity in COMMODITIES_CEPEA:
@@ -70,7 +84,7 @@ def atualizar_precos_cepea(self):
             df = asyncio.run(datasets.preco_diario(commodity))
             todos_registros.extend(
                 normalizar_precos_cepea(df, commodity=commodity,
-                fonte="CEPEA_SPOT")
+                fonte="CEPEA_SPOT", usd_brl=usd_brl)
             )
         except Exception as exc:
             logger.warning("Erro ao buscar preco CEPEA '%s': %s",
