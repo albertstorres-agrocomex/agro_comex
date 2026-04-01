@@ -156,21 +156,37 @@ def obter_taxa_usd_brl(tolerancia_dias: int = 7) -> float
 
 ## Modulo `dados/validacao/qualidade.py`
 
-### Enum
+### Duas etapas com comportamentos distintos
+
+**Etapa 1 — Inspecao estrutural (pre-persistencia):**
+Falhas estruturais impedem a persistencia do registro. O dado e descartado com log de warning.
+Nunca chegam ao banco.
+
+| Categoria | Gatilho | Comportamento |
+|-----------|---------|---------------|
+| `VALOR_INVALIDO` | nulo, negativo, tipo errado | Descarta — nao persiste |
+| `RANGE_ESPERADO` | fora do range fixo por indicador macro | Descarta — nao persiste |
+
+**Etapa 2 — Deteccao de outliers (pos-conversao, pre-persistencia):**
+Outliers sao **sempre persistidos** com flag de qualidade. Um outlier pode ser um evento de mercado real
+(guerra, pandemia, crise) e precisa estar disponivel para justificativa e analise historica.
+
+### Enum (aplicado apenas a registros persistidos)
 
 ```python
 class QualidadeDado(str, Enum):
-    OK       = "OK"        # dado valido, usado em todos os calculos
-    SUSPEITO = "SUSPEITO"  # aceito, mas requer revisao humana
-    INVALIDO = "INVALIDO"  # aceito no banco, excluido de calculos por padrao
+    OK       = "OK"        # dado valido, sem anomalias detectadas
+    SUSPEITO = "SUSPEITO"  # outlier moderado — incluido em calculos por padrao
+    INVALIDO = "INVALIDO"  # outlier extremo — excluido de calculos ate ser justificado
 ```
 
-### Categorias de motivo
+Um registro `INVALIDO` no banco **nunca e um NaN ou valor negativo** — esses sao descartados na Etapa 1.
+`INVALIDO` significa exclusivamente: "outlier estatistico extremo, potencialmente um evento real de mercado".
+
+### Categorias de motivo (apenas para registros persistidos)
 
 | Categoria | Gatilho |
 |-----------|---------|
-| `VALOR_INVALIDO` | nulo, negativo, tipo errado |
-| `RANGE_ESPERADO` | fora do range fixo por indicador macro |
 | `VARIACAO_DIARIA` | variacao percentual diaria acima do threshold |
 | `DESVIO_HISTORICO` | z-score acima do threshold (janela 90 dias) |
 
