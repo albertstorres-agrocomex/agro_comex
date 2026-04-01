@@ -28,8 +28,16 @@ class UserCommoditiesView(APIView):
             .values("preco_fechamento")[:1]
         )
 
+        ultima_qualidade = (
+            CacheDadosMercado.objects
+            .filter(commodity=OuterRef("pk"))
+            .order_by("-data_preco")
+            .values("qualidade")[:1]
+        )
+
         commodities = commodities.annotate(
-            preco_atual_raw=Subquery(ultimo_preco)
+            preco_atual_raw=Subquery(ultimo_preco),
+            qualidade_preco_atual=Subquery(ultima_qualidade),
         )
 
         result = [
@@ -39,7 +47,8 @@ class UserCommoditiesView(APIView):
                 "nome": c.nome,
                 "moeda": c.moeda,
                 "unidade": c.unidade,
-                "preco_atual": str(c.preco_atual_raw) if c.preco_atual_raw is not None else None,
+                "preco_atual": round(c.preco_atual_raw / 100, 2) if c.preco_atual_raw is not None else None,
+                "qualidade_preco_atual": c.qualidade_preco_atual,
             }
             for c in commodities
         ]
