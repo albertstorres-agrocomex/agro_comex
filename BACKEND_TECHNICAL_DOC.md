@@ -65,20 +65,34 @@ O model `Analise` (app `dados`, migration `0006_add_analise` e `0007_analise_add
 ---
 
 ### `analises`
-Nucleo do sistema. Gerencia o ciclo completo de precificacao:
+Nucleo do sistema. Gerencia o ciclo completo de precificacao e analise de cenarios:
 - `SolicitacaoAnalise`: recebe os parametros do usuario e enfileira a tarefa no Celery via `perform_create()` no ViewSet
-- `ResultadoAnalise`: armazena os dados calculados pelo worker (volatilidade, taxa de juros, grade de precos em `dados_brutos`)
+- `ResultadoAnalise`: armazena os dados calculados pelo worker (volatilidade, taxa de juros, campos Black-Scholes, cenario escolhido)
+- `CenarioAnalise`: representa um cenario de strike alternativo gerado automaticamente; armazena premio, curva e flags `recomendado`/`escolhido`
+- `PontoCurvaResultado`: pontos da curva de resultado (preco_ativo x resultado_financeiro) para um cenario
 
-Tarefa Celery (`analises/tasks.py`):
+Tarefas Celery (`analises/tasks.py`):
 
 | Tarefa | Descricao |
 |--------|-----------|
-| `processar_analise(solicitacao_id)` | Tarefa `@shared_task` com retry automatico (max 3, intervalo 30s). Transiciona `SolicitacaoAnalise` entre os estados `processando`, `concluido` e `erro`. Cria `ResultadoAnalise` com os campos calculados. |
+| `processar_analise(solicitacao_id)` | Tarefa `@shared_task` com retry automatico (max 3, intervalo 30s). Transiciona `SolicitacaoAnalise` entre os estados `processando`, `concluido` e `erro`. Chama `executar_analise_cenarios`, persiste `ResultadoAnalise`, `CenarioAnalise[]` e `PontoCurvaResultado[]`. |
+
+Funcoes em `analises/calculators.py`:
+
+| Funcao | Descricao |
+|--------|-----------|
+| `calcular_black_scholes(S, K, T, r, sigma, tipo)` | Precificacao Black-Scholes para call ou put. Retorna premio, percentual, valor total, lucro_maximo. |
+| `executar_analise_cenarios(solicitacao)` | Gera 3 strikes automaticos (K-10%, K, K+10%), calcula Black-Scholes para cada um. |
+| `calcular_curva_resultado(cenario)` | Gera serie de pontos (preco_ativo, resultado_financeiro) para exibicao da curva de payoff. |
+| `recomendar_cenario(cenarios)` | Seleciona o cenario de maior valor esperado; considera ponto de equilibrio como criterio desempate. |
+| `toneladas_para_sacas(toneladas, commodity)` | Converte toneladas para sacas conforme peso por saca da commodity. |
 
 Fluxo de estados de `SolicitacaoAnalise`:
 ```
 aguardando -> processando -> concluido
                           -> erro (com retry automatico ate 3x)
+aguardando -> processando -> concluido -> aprovado
+                                       -> rejeitado
 ```
 
 ---
@@ -127,6 +141,7 @@ Todos os endpoints seguem o padrao REST gerado pelo `DefaultRouter` do DRF. O pr
 | GET/PUT/PATCH/DELETE | `/api/v1/solicitacao_analise/{id}/` | Detalhe / atualiza / remove |
 | GET/POST | `/api/v1/resultado_analise/` | Lista / cria resultados de analise |
 | GET/PUT/PATCH/DELETE | `/api/v1/resultado_analise/{id}/` | Detalhe / atualiza / remove |
+| PATCH | `/api/v1/cenarios/{id}/escolher/` | Marca cenario como escolhido (exclusividade — desmarca outros do mesmo resultado) |
 
 ### Endpoints de Analise (app `dados`)
 
@@ -141,20 +156,23 @@ Todos requerem autenticacao Bearer. As views operam exclusivamente sobre registr
 | PATCH | `/api/v1/dados/analises/<id>/aprovar/` | Aprova a analise. Exige `status=em_analise`; retorna HTTP 409 se estado invalido. |
 | PATCH | `/api/v1/dados/analises/<id>/reprovar/` | Reprova a analise. Mesmas regras de estado que `/aprovar/`. |
 
-**Serializers novos:**
+**Serializers:**
 
 | Serializer | Uso |
 |------------|-----|
-| `AnaliseCreateSerializer` | Entrada de `POST /create/`. Valida `commodity` e `quantidade_toneladas`. |
-| `AnaliseDetailSerializer` | Saida de detalhe e criacao. Inclui `commodity_nome` via `_AnaliseComputedFieldsMixin`. |
+| `AnaliseCreateSerializer` | Entrada de `POST /create/`. Valida `commodity`, `quantidade_toneladas`, `preco_exercicio`, `mes_contrato`. |
+| `AnaliseDetailSerializer` | Saida de detalhe e criacao. Inclui `commodity_nome` e campos do resultado Black-Scholes. |
 | `AnaliseStatusCountSerializer` | Saida de `/status-count/`. Campos: `pendente`, `em_analise`, `aprovado`, `rejeitado`, `total`. |
+| `CenarioAnaliseSerializer` | Saida de cenarios com pontos da curva de resultado. |
+| `PontoCurvaResultadoSerializer` | Pontos (preco_ativo, resultado_financeiro) de um cenario. |
+| `ResultadoAnaliseSerializer` | Extendido para incluir `cenarios[]` com serializers acima. |
 | `_AnaliseComputedFieldsMixin` | Mixin interno que adiciona `commodity_nome` (campo computado read-only). |
 
 **Tarefa Celery:**
 
 | Tarefa | Caminho | Descricao |
 |--------|---------|-----------|
-| `processar_analise` | `dados.tasks.processar_analise` | Recebe `analise_id`. Guarda contra status diferente de `pendente` (idempotencia). Transiciona para `em_analise` e preenche `resultado` com placeholder. |
+| `processar_analise` | `analises.tasks.processar_analise` | Recebe `solicitacao_id`. Guarda contra status diferente de `aguardando` (idempotencia). Transiciona para `processando`, executa Black-Scholes com cenarios, persiste ResultadoAnalise + CenarioAnalise[] + PontoCurvaResultado[]. |
 
 ### Estrutura de URLs por app
 
@@ -211,21 +229,118 @@ COMMODITY_NOME_PARA_CODIGO = {
 }
 ```
 
-### Pipeline de normalizacao
+### Pipeline de normalizacao e qualidade
 
-Dados de commodity (precos, exportacao):
+Fluxo completo para precos de commodity:
 
-1. Dados brutos (DataFrame pandas) recebidos da fonte
-2. Normalizacao em `dados/limpeza/agrobr.py` para lista de dicts: `codigo_commodity`, `data_preco`, `preco_fechamento` (inteiro em centavos), `fonte`
-3. Persistencia via `persistir_cache_dados_mercado()` em `CacheDadosMercado` (upsert por `commodity + data_preco + fonte`)
+```
+Fonte externa (agrobr lib)
+        |
+        v
+normalizar_*()           [dados/limpeza/agrobr.py]
+  - extrai coluna correta do DataFrame (B3: "ajuste_atual"; CEPEA: "valor")
+  - mapeia nome fonte -> codigo_commodity (COMMODITY_NOME_PARA_CODIGO)
+        |
+        v
+converter_*()            [dados/limpeza/conversao.py]
+  - converte unidade/moeda para padrao da commodity
+  - resultado: USD/unidade-nativa (USD/bu ou USD/lb)
+        |
+        v
+[* 100] -> preco_fechamento em centavos de USD
+        |
+        v
+validar_preco()          [dados/validacao/qualidade.py]
+  - Etapa 1 (estrutural): preco <= 0 ou NaN -> descarta, nao persiste
+  - Etapa 2 (outlier): variacao diaria + z-score historico -> flag
+  - retorna (QualidadeDado, motivo_str)
+        |
+        v
+persistir_*()            [dados/servicos.py]
+  - grava com campos qualidade, motivo_qualidade
+```
 
 Dados macroeconomicos (BCB):
 
 1. DataFrame com index=data e colunas=indicadores recebido do `python-bcb`
 2. Normalizacao em `dados/limpeza/bcb.py` para lista de dicts: `indicador`, `data`, `valor` (float), `fonte`
-3. Persistencia via `persistir_dados_macroeconomicos()` em `DadosMacroeconomicos` (upsert por `indicador + data`)
+3. `validar_macro()` — range check estrutural por indicador; falhas descartadas
+4. Persistencia via `persistir_dados_macroeconomicos()` em `DadosMacroeconomicos` (upsert por `indicador + data`)
 
 Precos de commodity sao armazenados como inteiros (centavos) para evitar imprecisao de ponto flutuante. Indicadores macro usam `DecimalField(max_digits=18, decimal_places=6)`.
+
+### Conversao de unidade por fonte
+
+Cada contrato B3 e o CEPEA retornam precos em unidades distintas. A conversao para a unidade padrao da commodity ocorre em `dados/limpeza/conversao.py`.
+
+#### Constantes fisicas (fontes: USDA, CBOT, ICE)
+
+```python
+SACA_KG              = 60.0
+KG_PER_BUSHEL_CORN   = 25.401   # milho USDA
+KG_PER_BUSHEL_SOY    = 27.216   # soja USDA
+KG_PER_LB            = 0.45359237
+
+SACAS_PER_BUSHEL_ZC  = 60 / 25.401   # ~2.362
+SACAS_PER_BUSHEL_ZS  = 60 / 27.216   # ~2.205
+LBS_PER_SACA_KC      = 60 / 0.4536   # ~132.277
+BU_PER_MT_ZS         = 1000 / 27.216 # ~36.744
+```
+
+#### Mapeamento B3
+
+| Codigo | Contrato B3 | Unidade B3 | Conversao para USD/unidade-padrao |
+|--------|-------------|-----------|-----------------------------------|
+| ZC | CCM | BRL/saca (60 kg) | `preco / SACAS_PER_BUSHEL_ZC / usd_brl` |
+| ZS | SFI (soja_fob) | USD/tonelada metrica | `preco / BU_PER_MT_ZS` |
+| KC | ICF (cafe_arabica) | USD/saca (60 kg) | `preco / LBS_PER_SACA_KC` |
+
+#### Mapeamento CEPEA
+
+| Codigo | Unidade CEPEA | Moeda | Conversao para USD/unidade-padrao |
+|--------|--------------|-------|-----------------------------------|
+| ZC | saca (60 kg) | BRL | `preco / SACAS_PER_BUSHEL_ZC / usd_brl` |
+| ZS | saca (60 kg) | BRL | `preco / SACAS_PER_BUSHEL_ZS / usd_brl` |
+| KC | saca (60 kg) | BRL | `preco / LBS_PER_SACA_KC / usd_brl` |
+
+A taxa `usd_brl` e obtida via `obter_taxa_usd_brl()` que le `DadosMacroeconomicos` (indicador=`USD_BRL`). Se a taxa estiver ausente ou desatualizada (> 7 dias), a ingestao CEPEA e abortada e a ingestao B3 ignora contratos em BRL (ZC/CCM).
+
+### Qualidade de dados
+
+Campos adicionados a `CacheDadosMercado`, `DadosMacroeconomicos` e `ExportacaoMensal`:
+
+| Campo | Tipo | Descricao |
+|-------|------|-----------|
+| `qualidade` | CharField | `OK` / `SUSPEITO` / `INVALIDO` |
+| `motivo_qualidade` | TextField (nullable) | Ex: `VARIACAO_DIARIA:+23.4%\|DESVIO_HISTORICO:z=3.8` |
+| `justificado` | BooleanField | Operador confirmou que outlier e evento real |
+| `justificativa` | TextField (nullable) | Ex: "Guerra Russia-Ucrania: pico milho fev/2022" |
+
+#### Thresholds de outlier para precos
+
+| Metrica | SUSPEITO | INVALIDO |
+|---------|----------|---------|
+| Variacao diaria absoluta | > 15% | > 50% |
+| Z-score (janela 90 dias) | > 3sigma | > 5sigma |
+
+**Principio fundamental**: todos os registros persistidos — inclusive `INVALIDO` — participam dos calculos de volatilidade e Black-Scholes. Guerras, pandemias e crises geram outliers reais que fazem parte da historia do mercado. O flag e exclusivamente para catalogacao e auditoria.
+
+Um `INVALIDO` no banco **nunca e NaN ou valor negativo** — esses sao descartados na Etapa 1 e nao chegam ao banco.
+
+### Reset e re-ingestao
+
+Para zerar dados de mercado e re-ingerir com a pipeline corrigida:
+
+```bash
+python manage.py reset_dados_mercado          # lista tabelas, nao executa
+python manage.py reset_dados_mercado --confirm # executa o reset
+```
+
+**Tabelas zeradas**: `cache_dados_mercado`, `dados_macroeconomicos`, `exportacao_mensal`, `solicitacoes_analise`, `resultados_analise`, `cenarios_analise`, `pontos_curva_resultado`.
+
+**Tabelas preservadas**: `commodities`, `auth_user`, `usuarios_perfil`, tabelas de configuracao.
+
+Apos o reset, re-acionar as tasks Celery na ordem: BCB cambio -> B3/CEPEA -> exportacao.
 
 ### Model DadosMacroeconomicos
 
@@ -310,7 +425,7 @@ O sistema utiliza o modelo Black-Scholes para precificacao de opcoes europeias (
 | Parametro | Origem | Campo no modelo |
 |-----------|--------|-----------------|
 | S — preco atual do ativo | Ultimo preco em `CacheDadosMercado` | `SolicitacaoAnalise.preco_mercado_atual` |
-| K — strike / preco de exercicio | Informado pelo usuario | `SolicitacaoAnalise.preco_exercicio` |
+| K — strike / preco de exercicio | Informado pelo usuario (obrigatorio) | `SolicitacaoAnalise.preco_exercicio` |
 | T — tempo ate vencimento (anos) | Calculado de `MesContratoFurturo.data_vencimento` | — |
 | r — taxa livre de risco | SELIC mais recente em `DadosMacroeconomicos` | — |
 | sigma — volatilidade anualizada | Desvio padrao dos retornos log dos ultimos 252 pregoes em `CacheDadosMercado` | — |
