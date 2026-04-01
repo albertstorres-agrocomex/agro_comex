@@ -176,12 +176,22 @@ Outliers sao **sempre persistidos** com flag de qualidade. Um outlier pode ser u
 ```python
 class QualidadeDado(str, Enum):
     OK       = "OK"        # dado valido, sem anomalias detectadas
-    SUSPEITO = "SUSPEITO"  # outlier moderado — incluido em calculos por padrao
-    INVALIDO = "INVALIDO"  # outlier extremo — excluido de calculos ate ser justificado
+    SUSPEITO = "SUSPEITO"  # outlier moderado — catalogado para atencao
+    INVALIDO = "INVALIDO"  # outlier extremo — catalogado, mas INCLUIDO nos calculos
 ```
 
-Um registro `INVALIDO` no banco **nunca e um NaN ou valor negativo** — esses sao descartados na Etapa 1.
-`INVALIDO` significa exclusivamente: "outlier estatistico extremo, potencialmente um evento real de mercado".
+**Principio fundamental:** todos os registros persistidos participam dos calculos,
+independentemente do flag de qualidade. Guerras, pandemias e crises globais geram
+outliers reais que fazem parte da historia do mercado e devem influenciar
+volatilidade e precificacao. Excluir esses dados distorceria os modelos.
+
+O flag `qualidade` e exclusivamente para **catalogacao e auditoria**:
+- Permite identificar periodos anomalos na serie historica
+- Permite que um operador documente a causa via `justificativa`
+- Permite filtros em analises exploratorias futuras
+
+Um registro `INVALIDO` no banco **nunca e um NaN ou valor negativo** — esses sao
+descartados na Etapa 1 e nunca chegam ao banco.
 
 ### Categorias de motivo (apenas para registros persistidos)
 
@@ -232,9 +242,9 @@ justificativa    = models.TextField(null=True, blank=True)
 
 ### Uso downstream (Black-Scholes e preco_atual)
 
-- `calcular_volatilidade()` em `calculators.py`: incluir `OK`, `SUSPEITO` e `INVALIDO` com `justificado=True`; excluir apenas `INVALIDO` com `justificado=False`
-- `UserCommoditiesView`: mesma regra para `preco_atual` (priorizar o mais recente que nao seja `INVALIDO` nao-justificado)
-- `SUSPEITO` e incluido por padrao — representa anomalia toleravel, dado aceito sem ressalvas para calculos
+- `calcular_volatilidade()` em `calculators.py`: inclui **todos** os registros persistidos (`OK`, `SUSPEITO`, `INVALIDO`) — nenhum e excluido por flag de qualidade
+- `UserCommoditiesView`: usa o registro mais recente independente de qualidade; se o mais recente for `INVALIDO`, exibe o valor com indicador visual de anomalia no frontend
+- O campo `justificado` e `justificativa` sao anotacoes humanas para documentacao — nao alteram o comportamento de calculos
 
 ### Justificativa de outliers
 
