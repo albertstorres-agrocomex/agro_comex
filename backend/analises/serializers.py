@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from analises.models import SolicitacaoAnalise, ResultadoAnalise
+from analises.models import SolicitacaoAnalise, ResultadoAnalise, CenarioAnalise, PontoCurvaResultado
 from meses_contrato_futuro.models import MesContratoFurturo as MesContratoFurturoModel
 
 
@@ -143,10 +143,55 @@ class SolicitacaoAnaliseReadSerializer(serializers.ModelSerializer):
         ]
 
 
+class PontoCurvaResultadoSerializer(serializers.ModelSerializer):
+    preco     = serializers.SerializerMethodField()
+    resultado = serializers.SerializerMethodField()
+
+    def get_preco(self, obj):
+        return round(obj.preco_centavos / 100, 2)
+
+    def get_resultado(self, obj):
+        return round(obj.resultado_centavos / 100, 2)
+
+    class Meta:
+        model  = PontoCurvaResultado
+        fields = ["preco", "resultado"]
+
+
+class CenarioAnaliseSerializer(serializers.ModelSerializer):
+    preco_exercicio  = serializers.SerializerMethodField()
+    premio           = serializers.SerializerMethodField()
+    valor_total      = serializers.SerializerMethodField()
+    ponto_equilibrio = serializers.SerializerMethodField()
+    pontos_curva     = PontoCurvaResultadoSerializer(many=True, read_only=True)
+
+    def get_preco_exercicio(self, obj):
+        return round(obj.preco_exercicio_centavos / 100, 2)
+
+    def get_premio(self, obj):
+        return round(obj.premio_centavos / 100, 2)
+
+    def get_valor_total(self, obj):
+        return round(obj.valor_total_centavos / 100, 2)
+
+    def get_ponto_equilibrio(self, obj):
+        return round(obj.ponto_equilibrio_centavos / 100, 2)
+
+    class Meta:
+        model  = CenarioAnalise
+        fields = [
+            "id", "nome", "fator", "preco_exercicio", "premio",
+            "valor_total", "ponto_equilibrio", "nivel_risco",
+            "e_recomendado", "escolhido_pelo_usuario", "escolhido_em",
+            "pontos_curva",
+        ]
+
+
 class ResultadoAnaliseSerializer(serializers.ModelSerializer):
     premio_calculado      = serializers.SerializerMethodField()
     valor_total_contrato  = serializers.SerializerMethodField()
     lucro_maximo          = serializers.SerializerMethodField()
+    cenarios              = CenarioAnaliseSerializer(many=True, read_only=True)
 
     def get_premio_calculado(self, obj):
         if obj.premio_calculado is None:
@@ -176,4 +221,5 @@ class ResultadoAnaliseSerializer(serializers.ModelSerializer):
             "taxa_juros_utilizada",
             "dados_brutos",
             "calculado_em",
+            "cenarios",
         ]
