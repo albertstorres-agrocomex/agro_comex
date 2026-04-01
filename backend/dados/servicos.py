@@ -11,13 +11,16 @@ def persistir_cache_dados_mercado(registros: list[dict[str, Any]]) -> int:
     Cada dict deve ter:
       codigo_commodity: str  — campo `codigo` da Comomodity
       data_preco:       date
-      preco_fechamento: int
+      preco_fechamento: int  — em centavos de USD
       fonte:            str
 
+    Etapa 1 (estrutural): registros com preco invalido (<=0, NaN) sao descartados.
+    Etapa 2 (outlier): registros com variacao/z-score anomalos sao persistidos com flag.
     Retorna numero de registros persistidos.
     """
     from commodities.models import Comomodity
     from dados.models import CacheDadosMercado
+    from dados.validacao.qualidade import validar_preco
 
     persistidos = 0
 
@@ -25,7 +28,20 @@ def persistir_cache_dados_mercado(registros: list[dict[str, Any]]) -> int:
         codigo = registro.get("codigo_commodity")
         if not codigo:
             continue
-        
+
+        preco = registro.get("preco_fechamento")
+        data_preco = registro.get("data_preco")
+        fonte = registro.get("fonte")
+
+        try:
+            qualidade, motivo = validar_preco(codigo, preco, data_preco, fonte)
+        except ValueError as exc:
+            logger.warning(
+                "Preco descartado (falha estrutural) — commodity=%s data=%s: %s",
+                codigo, data_preco, exc,
+            )
+            continue
+
         try:
             commodity = Comomodity.objects.get(codigo=codigo, ativo=True)
         except Comomodity.DoesNotExist:
@@ -37,9 +53,13 @@ def persistir_cache_dados_mercado(registros: list[dict[str, Any]]) -> int:
 
         CacheDadosMercado.objects.update_or_create(
             commodity=commodity,
-            data_preco=registro["data_preco"],
-            fonte=registro["fonte"],
-            defaults={"preco_fechamento": registro["preco_fechamento"]},
+            data_preco=data_preco,
+            fonte=fonte,
+            defaults={
+                "preco_fechamento": preco,
+                "qualidade": qualidade.value,
+                "motivo_qualidade": motivo,
+            },
         )
         persistidos += 1
 
@@ -63,6 +83,8 @@ def persistir_dados_macroeconomicos(registros: list[dict]) -> int:
     persistidos = 0
     indicadores_validos = {k for k, _ in DadosMacroeconomicos.INDICADORES}
 
+    from dados.validacao.qualidade import validar_macro
+
     for registro in registros:
         indicador = registro.get("indicador")
         if indicador not in indicadores_validos:
@@ -82,12 +104,23 @@ def persistir_dados_macroeconomicos(registros: list[dict]) -> int:
             continue
 
         try:
+            qualidade, motivo = validar_macro(indicador, float(valor), data)
+        except ValueError as exc:
+            logger.warning(
+                "Dado macro descartado (falha estrutural) — indicador=%s data=%s: %s",
+                indicador, data, exc,
+            )
+            continue
+
+        try:
             DadosMacroeconomicos.objects.update_or_create(
                 indicador=indicador,
                 data=data,
                 defaults={
                     "valor": Decimal(str(valor)),
                     "fonte": fonte,
+                    "qualidade": qualidade.value,
+                    "motivo_qualidade": motivo,
                 },
             )
             persistidos += 1
@@ -119,6 +152,8 @@ def persistir_exportacao_mensal(registros: list[dict[str, Any]]) -> int:
         for c in Comomodity.objects.filter(codigo__in=codigos, ativo=True)
     }
 
+    from dados.validacao.qualidade import validar_exportacao
+
     count = 0
     for registro in registros:
         codigo = registro.get("codigo_commodity")
@@ -131,11 +166,28 @@ def persistir_exportacao_mensal(registros: list[dict[str, Any]]) -> int:
                 codigo,
             )
             continue
+
+        valor_fob = registro.get("valor_fob_usd")
+        data_ref = registro.get("data_referencia")
+
+        try:
+            qualidade, motivo = validar_exportacao(codigo, float(valor_fob), data_ref)
+        except ValueError as exc:
+            logger.warning(
+                "Exportacao descartada (falha estrutural) — commodity=%s data=%s: %s",
+                codigo, data_ref, exc,
+            )
+            continue
+
         ExportacaoMensal.objects.update_or_create(
             commodity=commodity,
-            data_referencia=registro["data_referencia"],
+            data_referencia=data_ref,
             fonte=registro["fonte"],
-            defaults={"valor_fob_usd": registro["valor_fob_usd"]},
+            defaults={
+                "valor_fob_usd": valor_fob,
+                "qualidade": qualidade.value,
+                "motivo_qualidade": motivo,
+            },
         )
         count += 1
     return count
