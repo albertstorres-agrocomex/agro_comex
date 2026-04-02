@@ -239,8 +239,8 @@ def recomendar_cenario(cenarios: list[dict], S: float) -> str:
 
 def executar_analise_cenarios(solicitacao) -> list[dict]:
     """
-    Executa Black-Scholes para 3 cenarios (conservador/moderado/agressivo),
-    gerando strikes automaticamente como fracao do preco de mercado atual.
+    Executa Black-Scholes para 3 cenarios fixos (conservador/moderado/agressivo)
+    e 1 cenario proposto usando o preco_exercicio do usuario diretamente.
     Nao muta o objeto solicitacao original.
     """
     from copy import deepcopy
@@ -272,7 +272,26 @@ def executar_analise_cenarios(solicitacao) -> list[dict]:
             "pontos_curva":             pontos_curva,
         })
 
-    nome_recomendado = recomendar_cenario(cenarios, S)
+    # Cenario proposto: usa o preco_exercicio do usuario diretamente como K
+    K_proposto_centavos = solicitacao.preco_exercicio
+    clone_proposto = deepcopy(solicitacao)
+    resultado_proposto = executar_calculo_bs(clone_proposto)
+
+    K_proposto = K_proposto_centavos / 100.0
+    premio_proposto = resultado_proposto["premio_calculado"] / 100.0
+    pontos_proposto = calcular_curva_resultado(S, K_proposto, premio_proposto, posicao, tipo_nome)
+
+    cenarios.append({
+        "nome":                     "proposto",
+        "preco_exercicio_centavos": K_proposto_centavos,
+        "premio_centavos":          resultado_proposto["premio_calculado"],
+        "e_recomendado":            False,
+        "pontos_curva":             pontos_proposto,
+    })
+
+    nome_recomendado = recomendar_cenario(
+        [c for c in cenarios if c["nome"] != "proposto"], S
+    )
     for c in cenarios:
         c["e_recomendado"] = (c["nome"] == nome_recomendado)
 

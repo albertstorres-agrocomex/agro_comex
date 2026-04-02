@@ -413,13 +413,13 @@ class TestExecutarAnaliseCenarios:
 
     @patch("analises.calculators.calcular_volatilidade")
     @patch("analises.calculators.obter_taxa_selic")
-    def test_retorna_lista_com_3_cenarios(self, mock_selic, mock_vol):
+    def test_retorna_lista_com_4_cenarios(self, mock_selic, mock_vol):
         from analises.calculators import executar_analise_cenarios
         mock_selic.return_value = 0.1075
         mock_vol.return_value = 0.25
         sol = self._make_solicitacao()
         resultado = executar_analise_cenarios(sol)
-        assert len(resultado) == 3
+        assert len(resultado) == 4
 
     @patch("analises.calculators.calcular_volatilidade")
     @patch("analises.calculators.obter_taxa_selic")
@@ -430,7 +430,7 @@ class TestExecutarAnaliseCenarios:
         sol = self._make_solicitacao()
         resultado = executar_analise_cenarios(sol)
         nomes = {c["nome"] for c in resultado}
-        assert nomes == {"conservador", "moderado", "agressivo"}
+        assert nomes == {"conservador", "moderado", "agressivo", "proposto"}
 
     @patch("analises.calculators.calcular_volatilidade")
     @patch("analises.calculators.obter_taxa_selic")
@@ -440,7 +440,9 @@ class TestExecutarAnaliseCenarios:
         mock_vol.return_value = 0.25
         sol = self._make_solicitacao()
         resultado = executar_analise_cenarios(sol)
-        strikes = [c["preco_exercicio_centavos"] for c in resultado]
+        # 3 cenarios fixos + 1 proposto = 4 strikes distintos
+        cenarios_fixos = [c for c in resultado if c["nome"] != "proposto"]
+        strikes = [c["preco_exercicio_centavos"] for c in cenarios_fixos]
         assert len(set(strikes)) == 3
 
     @patch("analises.calculators.calcular_volatilidade")
@@ -504,3 +506,37 @@ class TestExecutarAnaliseCenarios:
         }
         for cenario in resultado:
             assert chaves_esperadas.issubset(cenario.keys())
+
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_cenario_proposto_usa_preco_exercicio_do_usuario(self, mock_selic, mock_vol):
+        from analises.calculators import executar_analise_cenarios
+        mock_selic.return_value = 0.1075
+        mock_vol.return_value = 0.25
+        sol = self._make_solicitacao()
+        sol.preco_exercicio = 12500  # diferente de preco_mercado_atual=13000
+        resultado = executar_analise_cenarios(sol)
+        proposto = next(c for c in resultado if c["nome"] == "proposto")
+        assert proposto["preco_exercicio_centavos"] == 12500
+
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_cenario_proposto_nao_e_recomendado(self, mock_selic, mock_vol):
+        from analises.calculators import executar_analise_cenarios
+        mock_selic.return_value = 0.1075
+        mock_vol.return_value = 0.25
+        sol = self._make_solicitacao()
+        resultado = executar_analise_cenarios(sol)
+        proposto = next(c for c in resultado if c["nome"] == "proposto")
+        assert proposto["e_recomendado"] is False
+
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_cenario_proposto_tem_25_pontos_curva(self, mock_selic, mock_vol):
+        from analises.calculators import executar_analise_cenarios
+        mock_selic.return_value = 0.1075
+        mock_vol.return_value = 0.25
+        sol = self._make_solicitacao()
+        resultado = executar_analise_cenarios(sol)
+        proposto = next(c for c in resultado if c["nome"] == "proposto")
+        assert len(proposto["pontos_curva"]) == 25
