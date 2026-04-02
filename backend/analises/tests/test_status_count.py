@@ -26,6 +26,7 @@ class StatusCountViewTest(TestCase):
             commodity=self.commodity,
             tipo_derivativo=self.tipo,
             preco_mercado_atual=100,
+            preco_exercicio=13000,
             status=st,
         )
 
@@ -55,6 +56,7 @@ class StatusCountViewTest(TestCase):
             commodity=self.commodity,
             tipo_derivativo=self.tipo,
             preco_mercado_atual=100,
+            preco_exercicio=13000,
             status=SolicitacaoAnalise.Status.APROVADO,
         )
         self._make(SolicitacaoAnalise.Status.APROVADO)
