@@ -33,7 +33,7 @@ export interface SolicitacaoAnaliseData {
 
 export interface CenarioAnaliseData {
   id: number;
-  nome: "conservador" | "moderado" | "agressivo";
+  nome: "conservador" | "moderado" | "agressivo" | "proposto";
   fator: string | null;
   preco_exercicio: number;
   premio: number;
@@ -158,6 +158,16 @@ export async function fetchMesesContrato(commodityId: number): Promise<MesContra
   if (!res.ok) throw new Error("Erro ao buscar meses de contrato");
   const data = await res.json();
   return data.results ?? data;
+}
+
+export async function escolherCenario(cenarioId: number): Promise<CenarioAnaliseData> {
+  const res = await apiFetch(`${BASE}/cenarios/${cenarioId}/escolher/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) throw new Error("Erro ao escolher cenario");
+  return res.json();
 }
 
 export async function avaliarSolicitacao(
