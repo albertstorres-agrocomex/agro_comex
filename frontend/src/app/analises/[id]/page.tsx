@@ -378,25 +378,18 @@ export default function AnaliseDetailPage() {
     });
   }, [solicitacao?.resultado]);
 
-  if (isLoading) return null;
-  if (!isAuthenticated) return null;
-
-  const statusCfg = solicitacao ? STATUS_CONFIG[solicitacao.status] : null;
-  const resultado = solicitacao?.resultado;
   const cenarios = useMemo(
-    () => [...(resultado?.cenarios ?? [])].sort(
+    () => [...(solicitacao?.resultado?.cenarios ?? [])].sort(
       (a, b) => a.preco_exercicio - b.preco_exercicio
     ),
-    [resultado?.cenarios]
+    [solicitacao?.resultado?.cenarios]
   );
-  const moeda = solicitacao?.commodity_moeda ?? "R$";
-  const podeEscolher = solicitacao?.status === "concluido";
 
   const propostoCfg = useMemo(() => {
     const proposto = cenarios.find((c) => c.nome === "proposto");
     if (!proposto) return null;
     const fixos = cenarios.filter((c) => c.nome !== "proposto");
-    if (fixos.length === 0) return null;
+    if (fixos.length === 0) return CENARIO_CONFIG.moderado;
     const closest = fixos.reduce((prev, curr) =>
       Math.abs(curr.preco_exercicio - proposto.preco_exercicio) <
       Math.abs(prev.preco_exercicio - proposto.preco_exercicio)
@@ -405,6 +398,14 @@ export default function AnaliseDetailPage() {
     );
     return CENARIO_CONFIG[closest.nome as keyof typeof CENARIO_CONFIG];
   }, [cenarios]);
+
+  if (isLoading) return null;
+  if (!isAuthenticated) return null;
+
+  const statusCfg = solicitacao ? STATUS_CONFIG[solicitacao.status] : null;
+  const resultado = solicitacao?.resultado;
+  const moeda = solicitacao?.commodity_moeda ?? "R$";
+  const podeEscolher = solicitacao?.status === "concluido";
 
   const mesLabel = solicitacao
     ? solicitacao.mes_contrato_ticket ??
@@ -806,7 +807,7 @@ export default function AnaliseDetailPage() {
                         stroke={
                           c.nome === "proposto"
                             ? "var(--accent)"
-                            : CENARIO_CONFIG[c.nome as keyof typeof CENARIO_CONFIG].chartStroke
+                            : (CENARIO_CONFIG[c.nome as keyof typeof CENARIO_CONFIG]?.chartStroke ?? "var(--muted-foreground)")
                         }
                         strokeWidth={2}
                         strokeDasharray={c.nome === "proposto" ? "5 3" : undefined}
