@@ -35,7 +35,7 @@ class SolicitacaoAnalise(models.Model):
         blank=True
     )
     preco_mercado_atual = models.IntegerField()
-    preco_exercicio = models.IntegerField(null=True, blank=True)
+    preco_exercicio = models.IntegerField()
     quantidade_sacas = models.IntegerField(null=True, blank=True)
     posicao = models.CharField(max_length=12, null=True, blank=True)
     nivel_barreira = models.IntegerField(null=True, blank=True)
@@ -54,7 +54,7 @@ class ResultadoAnalise(models.Model):
         on_delete=models.CASCADE
     )
     premio_calculado = models.IntegerField(null=True, blank=True)
-    percentual_premio = models.DecimalField(max_digits=8, decimal_places=4, null=True, blank=True)
+    percentual_premio = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
     valor_total_contrato = models.IntegerField(null=True, blank=True)
     lucro_maximo = models.IntegerField(null=True, blank=True)
     volatilidade_utilizada = models.DecimalField(max_digits=8, decimal_places=6, null=True, blank=True)
@@ -73,6 +73,7 @@ class CenarioAnalise(models.Model):
         CONSERVADOR = "conservador"
         MODERADO    = "moderado"
         AGRESSIVO   = "agressivo"
+        PROPOSTO    = "proposto"
 
     resultado                 = models.ForeignKey(
         ResultadoAnalise,
