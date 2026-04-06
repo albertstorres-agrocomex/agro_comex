@@ -3,6 +3,7 @@ import logging
 from decimal import Decimal
 from datetime import date
 
+
 logger = logging.getLogger(__name__)
 
 # Importacoes lazy para evitar circular imports em tempo de modulo;
@@ -154,10 +155,26 @@ def executar_calculo_bs(solicitacao) -> dict:
     """
     tipo_nome = solicitacao.tipo_derivativo.nome.lower()
 
+    _TIPOS_BARREIRA = ("call com barreira", "put com barreira")
+    _TIPOS_FUTUROS = ("forward", "swap")
+
+    if tipo_nome in _TIPOS_BARREIRA:
+        raise ValueError(
+            f"Tipo de derivativo '{solicitacao.tipo_derivativo.nome}' ainda nao suportado. "
+            "Opcoes com barreira (knock-in/knock-out) serao implementadas em versao futura "
+            "usando o modelo de Reiner-Rubinstein."
+        )
+
+    if tipo_nome in _TIPOS_FUTUROS:
+        raise ValueError(
+            f"Tipo de derivativo '{solicitacao.tipo_derivativo.nome}' ainda nao suportado. "
+            "Forward e Swap serao implementados em versao futura com modelos proprios "
+            "(cost-of-carry e VPL de fluxos descontados, respectivamente)."
+        )
+
     if tipo_nome not in ("call", "put"):
         raise ValueError(
-            f"Tipo de derivativo '{tipo_nome}' nao suportado. "
-            "Apenas 'call' e 'put' (opcoes europeias) sao calculados nesta versao."
+            f"Tipo de derivativo '{solicitacao.tipo_derivativo.nome}' nao reconhecido."
         )
 
     if solicitacao.preco_exercicio is None:

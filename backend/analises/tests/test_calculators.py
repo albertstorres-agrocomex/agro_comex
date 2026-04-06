@@ -212,7 +212,7 @@ class TestExecutarCalculoBs:
     def test_tipo_invalido_levanta_value_error(self):
         from analises.calculators import executar_calculo_bs
         sol = self._make_solicitacao(tipo_nome="knock_out")
-        with pytest.raises(ValueError, match="nao suportado"):
+        with pytest.raises(ValueError, match="nao reconhecido"):
             executar_calculo_bs(sol)
 
     def test_sem_preco_exercicio_levanta_value_error(self):

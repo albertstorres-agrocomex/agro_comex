@@ -441,12 +441,97 @@ O sistema utiliza o modelo Black-Scholes para precificacao de opcoes europeias (
 
 ### Tipos de derivativo suportados
 
-| Tipo | Suportado |
-|------|-----------|
-| `call` | Sim |
-| `put` | Sim |
-| `knock_out` | Nao — retorna status `erro` com mensagem explicativa |
-| `knock_in` | Nao — retorna status `erro` com mensagem explicativa |
+| Tipo | Rotulo | Suportado | Motivo |
+|------|--------|-----------|--------|
+| Call | `CALL` | Sim | Black-Scholes europeu |
+| Put | `PUT` | Sim | Black-Scholes europeu |
+| Call com Barreira | `CALL-B` | Nao — status `erro` | Exige modelo de opcoes exoticas (Reiner-Rubinstein) |
+| Put com Barreira | `PUT-B` | Nao — status `erro` | Exige modelo de opcoes exoticas (Reiner-Rubinstein) |
+| Forward | `FWD` | Nao — status `erro` | Exige modelo de cost-of-carry, nao Black-Scholes |
+| Swap | `SWAP` | Nao — status `erro` | Exige modelo de VPL de fluxos descontados |
+
+A rejeicao e feita em `executar_calculo_bs()` com mensagem descritiva antes de qualquer calculo.
+
+---
+
+### Modelos para implementacao futura
+
+#### Call com Barreira / Put com Barreira — Reiner-Rubinstein (1991)
+
+Opcoes com barreira sao opcoes exoticas cujo payoff depende de o preco do ativo ter tocado ou nao um nivel de barreira `H` durante a vigencia do contrato:
+
+- **Knock-Out**: a opcao e extinta se o preco tocar `H` antes do vencimento
+- **Knock-In**: a opcao so passa a existir se o preco tocar `H` antes do vencimento
+
+A formula analitica e uma extensao do Black-Scholes com os seguintes parametros adicionais:
+
+```
+H  = nivel da barreira (campo nivel_barreira, em centavos no banco)
+mu = (r - sigma^2 / 2) / sigma^2
+lambda = sqrt(mu^2 + 2*r / sigma^2)
+x1 = ln(S/H) / (sigma * sqrt(T)) + lambda * sigma * sqrt(T)
+y1 = ln(H/S) / (sigma * sqrt(T)) + lambda * sigma * sqrt(T)
+y  = ln(H^2 / (S*K)) / (sigma * sqrt(T)) + lambda * sigma * sqrt(T)
+```
+
+O premio e calculado combinando termos N(x1), N(y), N(y1) ponderados por `(H/S)^(2*lambda)`, variando conforme o tipo (down-in, down-out, up-in, up-out) e a direcao (call ou put).
+
+Referencia: Reiner, E. & Rubinstein, M. (1991). "Breaking Down the Barriers". Risk Magazine, 4(8), 28-35.
+
+Parametro extra necessario no model/serializer: `nivel_barreira` (ja existe como `IntegerField` em centavos) e o subtipo de barreira (knock-in vs knock-out — campo a criar em `TipoDerivativo` ou como escolha do usuario no formulario).
+
+---
+
+#### Forward — Modelo de Cost-of-Carry
+
+O preco justo de um contrato a termo sobre commodity e dado por:
+
+```
+F = S * e^((r + u - y) * T)
+```
+
+onde:
+- `S` = preco spot atual do ativo
+- `r` = taxa de juros livre de risco (SELIC)
+- `u` = custo de armazenamento (storage cost) como percentual anualizado
+- `y` = convenience yield (beneficio de manter o fisico disponivel)
+- `T` = tempo ate vencimento em anos
+
+Para commodities agricolas brasileiras, `u` e `y` podem ser aproximados por dados de mercado futuro da B3 (basis entre spot e futuro). Na ausencia de dados granulares, `u - y` pode ser tratado como parametro de calibracao.
+
+O resultado `F` representa o preco de entrega que torna o contrato com valor presente zero no inicio. Para marcar a mercado (MTM), o VPL do forward e:
+
+```
+VPL = (F_mercado - K) * Q * e^(-r * T)
+```
+
+onde `K` e o preco acordado e `Q` a quantidade.
+
+---
+
+#### Swap de Commodity — VPL de Fluxos Descontados
+
+Um swap de commodity troca um preco fixo `K` por um preco flutuante (spot ou forward) ao longo de N periodos de liquidacao. O valor presente do swap para o pagador do fixo e:
+
+```
+VPL = sum_{i=1}^{N} (F_i - K) * Q * delta_t_i * e^(-r_i * t_i)
+```
+
+onde:
+- `F_i` = preco forward para o periodo `i` (calculado pelo modelo de cost-of-carry acima)
+- `K` = preco fixo acordado
+- `Q` = quantidade por periodo
+- `delta_t_i` = duracao do periodo `i` em anos
+- `r_i` = taxa de desconto para o vencimento `t_i`
+- `t_i` = tempo em anos ate o final do periodo `i`
+
+Para um swap de liquidacao unica (caso mais simples), reduz-se a:
+
+```
+VPL = (F - K) * Q * e^(-r * T)
+```
+
+Implementacao requer: curva de forwards para multiplos vencimentos (disponivel via dados B3 futuros ja coletados) e interpolacao de taxa de desconto por prazo.
 
 ### Conversao de unidade no input
 
