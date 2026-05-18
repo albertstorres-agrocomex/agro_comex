@@ -1,18 +1,18 @@
 "use client"
 
+import { Suspense, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
-import { useEffect } from "react"
 import { TopMenu } from "@/components/system/layout/TopMenu"
 import { ChatInterface } from "@/components/system/chat/ChatInterface"
 
-export default function ChatPage() {
+function ChatPageInner() {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const analiseId = searchParams.get("analise_id")
-    ? Number(searchParams.get("analise_id"))
-    : undefined
+
+  const raw = searchParams.get("analise_id")
+  const analiseId = raw && !isNaN(Number(raw)) ? Number(raw) : undefined
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -43,5 +43,13 @@ export default function ChatPage() {
         </main>
       </div>
     </div>
+  )
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense>
+      <ChatPageInner />
+    </Suspense>
   )
 }
