@@ -14,7 +14,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
   return (
     <div className={cn("flex gap-3 px-4 py-3", isHuman ? "justify-end" : "justify-start")}>
       {!isHuman && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-semibold">
+        <div aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-semibold">
           IA
         </div>
       )}
@@ -32,7 +32,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
         )}
       </div>
       {isHuman && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)] text-xs font-semibold">
+        <div aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-foreground)] text-xs font-semibold">
           EU
         </div>
       )}

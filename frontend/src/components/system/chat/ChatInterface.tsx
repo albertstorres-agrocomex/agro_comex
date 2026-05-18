@@ -8,6 +8,7 @@ import { ChatMessage } from "./ChatMessage"
 import { createConversation, streamMessage } from "@/services/chatService"
 
 interface Message {
+  id: string
   role: "human" | "ai"
   content: string
 }
@@ -23,12 +24,19 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const streamActiveRef = useRef(false)
 
   useEffect(() => {
+    let cancelled = false
     createConversation(analiseId)
-      .then((conv) => setConversationId(conv.id))
-      .catch(() => setError("Nao foi possivel iniciar a conversa."))
+      .then((conv) => { if (!cancelled) setConversationId(conv.id) })
+      .catch(() => { if (!cancelled) setError("Nao foi possivel iniciar a conversa.") })
+    return () => { cancelled = true }
   }, [analiseId])
+
+  useEffect(() => {
+    return () => { streamActiveRef.current = false }
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -40,27 +48,33 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
     const userMessage = input.trim()
     setInput("")
     setError(null)
-    setMessages((prev) => [...prev, { role: "human", content: userMessage }])
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "human", content: userMessage }])
     setIsStreaming(true)
-    setMessages((prev) => [...prev, { role: "ai", content: "" }])
+    streamActiveRef.current = true
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "ai", content: "" }])
 
     try {
       await streamMessage(
         conversationId,
         userMessage,
         (chunk) => {
+          if (!streamActiveRef.current) return
           setMessages((prev) => {
             const updated = [...prev]
             updated[updated.length - 1] = {
-              role: "ai",
+              ...updated[updated.length - 1],
               content: updated[updated.length - 1].content + chunk,
             }
             return updated
           })
         },
-        () => setIsStreaming(false),
+        () => {
+          streamActiveRef.current = false
+          setIsStreaming(false)
+        },
       )
     } catch {
+      streamActiveRef.current = false
       setError("Erro ao processar a mensagem. Tente novamente.")
       setMessages((prev) => prev.slice(0, -1))
       setIsStreaming(false)
@@ -85,7 +99,7 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
           )}
           {messages.map((msg, idx) => (
             <ChatMessage
-              key={idx}
+              key={msg.id}
               role={msg.role}
               content={msg.content}
               isStreaming={isStreaming && idx === messages.length - 1 && msg.role === "ai"}
@@ -108,11 +122,13 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
             placeholder="Pergunte sobre suas analises..."
             disabled={!conversationId || isStreaming}
             className="flex-1"
+            aria-label="Digite sua mensagem"
           />
           <Button
             onClick={handleSend}
             disabled={!input.trim() || !conversationId || isStreaming}
             size="icon"
+            aria-label="Enviar mensagem"
           >
             <Send className="h-4 w-4" />
           </Button>
