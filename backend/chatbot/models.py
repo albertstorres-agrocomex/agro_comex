@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from django.conf import settings
+from pgvector.django import VectorField
 
 
 class Conversation(models.Model):
@@ -32,3 +33,18 @@ class ConversationMessage(models.Model):
     class Meta:
         db_table = "chatbot_messages"
         ordering = ["created_at"]
+
+
+class AnaliseEmbedding(models.Model):
+    analise = models.OneToOneField(
+        "analises.SolicitacaoAnalise",
+        on_delete=models.CASCADE,
+        related_name="embedding",
+    )
+    content = models.TextField()
+    content_hash = models.CharField(max_length=64)
+    embedding = VectorField(dimensions=1536)
+    embedded_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "chatbot_analise_embeddings"

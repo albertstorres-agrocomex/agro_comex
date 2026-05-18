@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'dados',
     'analises',
     'usuario',
+    'pgvector.django',
     'chatbot',
 ]
 
