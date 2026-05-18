@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'dados',
     'analises',
     'usuario',
+    'chatbot',
 ]
 
 MIDDLEWARE = [
