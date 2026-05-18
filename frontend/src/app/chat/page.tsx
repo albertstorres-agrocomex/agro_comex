@@ -1,0 +1,47 @@
+"use client"
+
+import { useRouter, useSearchParams } from "next/navigation"
+import { useAuth } from "@/contexts/AuthContext"
+import { useEffect } from "react"
+import { TopMenu } from "@/components/system/layout/TopMenu"
+import { ChatInterface } from "@/components/system/chat/ChatInterface"
+
+export default function ChatPage() {
+  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const analiseId = searchParams.get("analise_id")
+    ? Number(searchParams.get("analise_id"))
+    : undefined
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login")
+    }
+  }, [isAuthenticated, isLoading, router])
+
+  if (isLoading || !isAuthenticated) return null
+
+  return (
+    <div className="flex flex-col h-screen bg-[var(--background)]">
+      <TopMenu />
+      <div className="flex flex-1 min-h-0">
+        <main className="flex flex-col flex-1 min-h-0 max-w-3xl mx-auto w-full px-4 py-6">
+          <div className="mb-4">
+            <h1 className="text-xl font-semibold text-[var(--foreground)]">
+              Assistente AgroComex
+            </h1>
+            {analiseId && (
+              <p className="text-sm text-[var(--muted-foreground)] mt-0.5">
+                Contexto: analise #{analiseId}
+              </p>
+            )}
+          </div>
+          <div className="flex-1 min-h-0 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+            <ChatInterface analiseId={analiseId} />
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
