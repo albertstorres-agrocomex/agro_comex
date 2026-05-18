@@ -100,6 +100,11 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+AUTHENTICATION_BACKENDS = [
+    'authentication.backends.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # Django REST Framework
 
 REST_FRAMEWORK = {
@@ -154,3 +159,6 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# OpenAI
+OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
