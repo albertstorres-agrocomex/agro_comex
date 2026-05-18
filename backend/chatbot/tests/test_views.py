@@ -37,3 +37,47 @@ class ConversationCreateViewTest(TestCase):
         self.client.force_authenticate(user=outro)
         response = self.client.get(f"{self.url}{conv.id}/")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class ChatStreamAuthTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user_a = User.objects.create_user(username="stream_a@test.com", password="pass")
+        self.user_b = User.objects.create_user(username="stream_b@test.com", password="pass")
+        self.conv = Conversation.objects.create(user=self.user_a)
+        self.url = "/api/v1/chat/stream/"
+
+    def test_nao_autenticado_retorna_401(self):
+        response = self.client.post(
+            self.url,
+            data=json.dumps({"conversation_id": str(self.conv.id), "message": "oi"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_usuario_b_nao_acessa_conversa_do_usuario_a(self):
+        self.client.force_authenticate(user=self.user_b)
+        response = self.client.post(
+            self.url,
+            data=json.dumps({"conversation_id": str(self.conv.id), "message": "oi"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_conversa_inexistente_retorna_404(self):
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.post(
+            self.url,
+            data=json.dumps({"conversation_id": str(uuid.uuid4()), "message": "oi"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_mensagem_vazia_retorna_400(self):
+        self.client.force_authenticate(user=self.user_a)
+        response = self.client.post(
+            self.url,
+            data=json.dumps({"conversation_id": str(self.conv.id), "message": ""}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
