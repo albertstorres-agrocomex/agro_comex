@@ -53,9 +53,7 @@ export async function streamMessage(
       try {
         const { content } = JSON.parse(payload)
         if (content) onChunk(content)
-      } catch {
-        // ignora linha malformada
-      }
+      } catch { }
     }
   }
   onDone()
