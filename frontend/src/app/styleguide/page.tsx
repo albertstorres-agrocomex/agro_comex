@@ -4,6 +4,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { LoginCard } from "@/components/system/auth/LoginCard";
+import { CardSelecaoCenarioAnalise } from "@/components/CardSelecaoCenarioAnalise";
+import { Sidebar } from "@/components/system/layout/Sidebar";
+import { TopMenu } from "@/components/system/layout/TopMenu";
+import { CommodityPriceCard } from "@/components/CommodityPriceCard";
+import { RecentAnalysisCard } from "@/components/RecentAnalysisCard";
+import type { RecentAnalysisData } from "@/components/RecentAnalysisCard";
+import { CommodityImageCard } from "@/components/system/commodity/CommodityImageCard";
+import type { CommodityImageSize } from "@/components/system/commodity/CommodityImageCard";
+import { ChatMessage } from "@/components/system/chat/ChatMessage";
 
 // ─── Color scales ──────────────────────────────────────────────────────────
 // Primary = Verde Agro (#153A1E) — identidade visual do AgroComex
@@ -416,6 +426,90 @@ export default function StyleguidePage() {
         </div>
       </Section>
 
+      {/* ── CARDS DE COMMODITY — COR DINAMICA ── */}
+      <Section title="Cards de Commodity — Cor Dinamica">
+        <p className="text-xs text-muted-foreground mb-4">
+          Background de cada card assume a cor da linha correspondente no grafico (via <code className="font-mono bg-muted px-1 rounded">color_key</code> da serie).
+          Cores claras (chart-2, chart-3) recebem texto escuro; cores escuras recebem texto branco.
+          Escalavel para qualquer numero de commodities via <code className="font-mono bg-muted px-1 rounded">--chart-N</code>.
+        </p>
+
+        {/* Mock das 4 commodities atuais */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 h-44">
+
+          {/* Soja — chart-1 (verde escuro) */}
+          <div className="rounded-[var(--radius-xl)] p-4 flex flex-col justify-between" style={{ background: "var(--chart-1)" }}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-0.5 text-white/60">NCM 1201</p>
+                <p className="text-sm font-bold leading-tight text-white">Soja</p>
+              </div>
+              <span className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-white/20 text-white">+3,2%</span>
+            </div>
+            <div>
+              <p className="text-3xl font-bold tabular-nums leading-none mb-1 text-white">132,4<span className="text-xs font-normal ml-1 text-white/60">pts</span></p>
+              <p className="text-[11px] text-white/60">1T 2025</p>
+            </div>
+          </div>
+
+          {/* Milho — chart-2 (lima) */}
+          <div className="rounded-[var(--radius-xl)] p-4 flex flex-col justify-between" style={{ background: "var(--chart-2)" }}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-0.5 text-black/50">NCM 1005</p>
+                <p className="text-sm font-bold leading-tight text-black/85">Milho</p>
+              </div>
+              <span className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-black/12 text-black/75">-1,8%</span>
+            </div>
+            <div>
+              <p className="text-3xl font-bold tabular-nums leading-none mb-1 text-black/85">87,6<span className="text-xs font-normal ml-1 text-black/50">pts</span></p>
+              <p className="text-[11px] text-black/50">1T 2025</p>
+            </div>
+          </div>
+
+          {/* Cafe — chart-3 (ambar) */}
+          <div className="rounded-[var(--radius-xl)] p-4 flex flex-col justify-between" style={{ background: "var(--chart-3)" }}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-0.5 text-black/50">NCM 0901</p>
+                <p className="text-sm font-bold leading-tight text-black/85">Cafe</p>
+              </div>
+              <span className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-black/12 text-black/75">+7,5%</span>
+            </div>
+            <div>
+              <p className="text-3xl font-bold tabular-nums leading-none mb-1 text-black/85">214,9<span className="text-xs font-normal ml-1 text-black/50">pts</span></p>
+              <p className="text-[11px] text-black/50">1T 2025</p>
+            </div>
+          </div>
+
+          {/* Acucar — chart-4 (violeta) */}
+          <div className="rounded-[var(--radius-xl)] p-4 flex flex-col justify-between" style={{ background: "var(--chart-4)" }}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-0.5 text-white/60">NCM 1701</p>
+                <p className="text-sm font-bold leading-tight text-white">Acucar</p>
+              </div>
+              <span className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-white/20 text-white">+2,1%</span>
+            </div>
+            <div>
+              <p className="text-3xl font-bold tabular-nums leading-none mb-1 text-white">156,3<span className="text-xs font-normal ml-1 text-white/60">pts</span></p>
+              <p className="text-[11px] text-white/60">1T 2025</p>
+            </div>
+          </div>
+
+        </div>
+
+        <div className="mt-3 p-3 bg-muted rounded-lg">
+          <p className="text-xs font-mono text-muted-foreground">
+            chart-1 (verde) → text-white &nbsp;·&nbsp;
+            chart-2 (lima) → text-black/85 &nbsp;·&nbsp;
+            chart-3 (ambar) → text-black/85 &nbsp;·&nbsp;
+            chart-4 (violeta) → text-white &nbsp;·&nbsp;
+            chart-5+ → text-white (padrao)
+          </p>
+        </div>
+      </Section>
+
       {/* ── ALERTAS ── */}
       <Section title="Alertas">
         <p className="text-xs text-muted-foreground mb-4">
@@ -518,6 +612,333 @@ export default function StyleguidePage() {
               </RadioGroup>
             </CardContent>
           </Card>
+        </div>
+      </Section>
+
+      {/* ── COMPONENTES ── */}
+      <Section title="Componentes">
+        <p className="text-xs text-muted-foreground mb-6">
+          Componentes compostos do sistema — combinam tokens e primitivos shadcn/ui em blocos reutilizaveis.
+        </p>
+
+        {/* Sidebar */}
+        <div className="mb-10">
+          <p className="text-sm font-medium text-muted-foreground mb-1">Sidebar</p>
+          <p className="text-xs text-muted-foreground mb-4">
+            Navegacao principal da aplicacao. Fundo em primary-950 (#081F0F), item ativo com accent
+            (lima), logout com destructive no hover. Exibido em modo preview (posicionamento relativo).
+          </p>
+          <div className="h-[600px] w-60 overflow-hidden rounded-xl border border-border shadow-lg">
+            <Sidebar
+              preview
+              activePath="/dashboard"
+              userName="Mark Johnson"
+              appName="AgroComex"
+            />
+          </div>
+        </div>
+
+        {/* TopMenu */}
+        <div className="mb-10">
+          <p className="text-sm font-medium text-muted-foreground mb-1">TopMenu</p>
+          <p className="text-xs text-muted-foreground mb-4">
+            Navegacao horizontal alternativa ao Sidebar. Mesmo conjunto de rotas, estilo pill da
+            landing page — fundo primary-950, itens ativos com accent (lima), logout em destaque
+            no canto direito.
+          </p>
+          <div
+            className="flex items-start justify-center rounded-xl p-4"
+            style={{
+              background: "linear-gradient(135deg, oklch(0.12 0.04 145), oklch(0.22 0.06 145))",
+            }}
+          >
+            <TopMenu preview activePath="/dashboard" />
+          </div>
+        </div>
+
+        {/* LoginCard */}
+        <div className="mb-4">
+          <p className="text-sm font-medium text-muted-foreground mb-1">LoginCard</p>
+          <p className="text-xs text-muted-foreground mb-4">
+            Card de autenticacao com glassmorphism sobre a cor primaria. Fundo escuro abaixo simula
+            contexto real de uso (pagina de login com background fotografico ou gradiente).
+          </p>
+          <div
+            className="flex items-center justify-center rounded-xl p-12"
+            style={{
+              background: "linear-gradient(135deg, oklch(0.12 0.04 145), oklch(0.22 0.06 145), oklch(0.16 0.03 90))",
+            }}
+          >
+            <LoginCard />
+          </div>
+        </div>
+      </Section>
+
+      {/* ── COMMODITY PRICE CARD ── */}
+      <Section title="CommodityPriceCard">
+        <p className="text-xs text-muted-foreground mb-4">
+          Card de preco atual de commodity. Background igual ao corpo do dashboard (<code className="font-mono bg-muted px-1 rounded">--background</code>),
+          borda em tom escuro para diferenciacao. Badge de variacao usa <code className="font-mono bg-muted px-1 rounded">--success</code> (alta) e{" "}
+          <code className="font-mono bg-muted px-1 rounded">--destructive</code> (queda).
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 h-40">
+          <CommodityPriceCard
+            mode="export-index"
+            nome="Soja"
+            codigo="NCM 1201"
+            value={132.4}
+            quarter="1T 2025"
+            variation={3.2}
+          />
+          <CommodityPriceCard
+            mode="export-index"
+            nome="Milho"
+            codigo="NCM 1005"
+            value={87.6}
+            quarter="1T 2025"
+            variation={-1.8}
+          />
+          <CommodityPriceCard
+            mode="export-index"
+            nome="Cafe"
+            codigo="NCM 0901"
+            value={214.9}
+            quarter="1T 2025"
+            variation={7.5}
+          />
+        </div>
+
+        <div className="mt-3 p-3 bg-muted rounded-lg">
+          <p className="text-xs font-mono text-muted-foreground">
+            bg: --background &nbsp;·&nbsp;
+            border: foreground/20 &nbsp;·&nbsp;
+            variacao+: --success / --success-foreground &nbsp;·&nbsp;
+            variacao-: --destructive / --destructive-foreground
+          </p>
+        </div>
+      </Section>
+
+      {/* ─── RecentAnalysisCard ─────────────────────────────────────────── */}
+      <Section title="Recent Analysis Card" subtitle="Cards de historico de analises do usuario — canto direito do dashboard">
+        <p className="text-xs text-muted-foreground mb-3">
+          Fundo igual ao da pagina (sem fundo proprio). Sem bordas laterais — apenas linha inferior delimitando cada card.
+          Botao circular no canto superior direito alterna entre estado colapsado e expandido.
+        </p>
+
+        {/* Preview container with same bg as dashboard */}
+        <div className="rounded-[var(--radius-xl)] bg-background border border-border max-w-sm overflow-hidden">
+          {(
+            [
+              {
+                id: "sg-1",
+                commodityCode: "SOJ",
+                commodityColor: "var(--chart-1)",
+                commodityTextColor: "oklch(0.92 0.008 80)",
+                title: "Exportacao Soja — Safra 25/26",
+                status: "aprovado",
+                salePrice: 485.50,
+                salePriceCurrency: "USD",
+                salePriceUnit: "/ton",
+                contractType: "FOB",
+                expiryYear: 2025,
+                totalContractValue: "Valor total: USD 12.500.000,00",
+                country: "China",
+                timeAgo: "2h ago",
+              },
+              {
+                id: "sg-2",
+                commodityCode: "MIL",
+                commodityColor: "var(--chart-3)",
+                commodityTextColor: "oklch(0.175 0.018 70)",
+                title: "Contrato Milho — Q1 2026",
+                status: "pendente",
+                salePrice: 224.75,
+                salePriceCurrency: "USD",
+                salePriceUnit: "/ton",
+                contractType: "CIF",
+                expiryYear: 2026,
+                totalContractValue: "Valor total: USD 3.370.000,00",
+                country: "Espanha",
+                timeAgo: "5h ago",
+              },
+              {
+                id: "sg-3",
+                commodityCode: "CAF",
+                commodityColor: "var(--chart-2)",
+                commodityTextColor: "oklch(0.175 0.018 70)",
+                title: "Exportacao Cafe Arabica — Europa",
+                status: "em_analise",
+                salePrice: 3180.00,
+                salePriceCurrency: "USD",
+                salePriceUnit: "/ton",
+                contractType: "CFR",
+                expiryYear: 2025,
+                totalContractValue: "Valor total: USD 1.908.000,00",
+                country: "Alemanha",
+                timeAgo: "1d ago",
+              },
+            ] as RecentAnalysisData[]
+          ).map((analysis) => (
+            <RecentAnalysisCard key={analysis.id} analysis={analysis} />
+          ))}
+        </div>
+
+        <div className="mt-3 p-3 bg-muted rounded-lg">
+          <p className="text-xs font-mono text-muted-foreground">
+            fundo: --background (transparente) &nbsp;·&nbsp;
+            separador: border-b --border &nbsp;·&nbsp;
+            botao toggle: oklch(bg - 0.15 lightness) &nbsp;·&nbsp;
+            status: --success / --warning / --info / --destructive &nbsp;·&nbsp;
+            badges contrato: --muted / --muted-foreground
+          </p>
+        </div>
+      </Section>
+
+      {/* ─── CommodityImageCard ──────────────────────────────────────────── */}
+      <Section title="CommodityImageCard">
+        <p className="text-xs text-muted-foreground mb-6">
+          Container padrao para imagens de commodities. Dimensoes fixas por variante de tamanho —{" "}
+          <code className="font-mono bg-muted px-1 rounded">sm</code>,{" "}
+          <code className="font-mono bg-muted px-1 rounded">md</code>,{" "}
+          <code className="font-mono bg-muted px-1 rounded">lg</code> — garantindo consistencia visual em todo o sistema.
+          A imagem usa <code className="font-mono bg-muted px-1 rounded">object-contain</code>: nunca e cortada, sempre
+          visivel integralmente, com aspect ratio preservado.
+        </p>
+
+        {/* Size variants */}
+        <div className="mb-8">
+          <p className="text-xs text-muted-foreground mb-3 uppercase tracking-widest">Variantes de tamanho</p>
+          <div className="flex flex-wrap items-end gap-6">
+            {(["sm", "md", "lg"] as CommodityImageSize[]).map((size) => (
+              <div key={size} className="flex flex-col items-center gap-2">
+                <CommodityImageCard
+                  src="/placeholder-commodity.png"
+                  alt={`Commodity — variante ${size}`}
+                  size={size}
+                />
+                <p className="text-xs font-mono text-muted-foreground">{size}</p>
+                <p className="text-[10px] text-muted-foreground/70">
+                  {size === "sm" ? "64px" : size === "md" ? "96px" : "128px"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Usage inside a card */}
+        <div className="mb-6">
+          <p className="text-xs text-muted-foreground mb-3 uppercase tracking-widest">Uso em card de commodity</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
+            {[
+              { nome: "Soja", codigo: "NCM 1201" },
+              { nome: "Milho", codigo: "NCM 1005" },
+              { nome: "Cafe", codigo: "NCM 0901" },
+            ].map(({ nome, codigo }) => (
+              <div
+                key={codigo}
+                className="flex items-center gap-3 p-3 rounded-[var(--radius-lg)] border border-border bg-card shadow-sm"
+              >
+                <CommodityImageCard
+                  src="/placeholder-commodity.png"
+                  alt={nome}
+                  size="md"
+                />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold leading-tight">{nome}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{codigo}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-3 bg-muted rounded-lg">
+          <p className="text-xs font-mono text-muted-foreground">
+            container: --muted &nbsp;·&nbsp; border: --border/60 &nbsp;·&nbsp;
+            radius: --radius-md &nbsp;·&nbsp; image: object-contain + p-1.5 &nbsp;·&nbsp;
+            sizes: sm=64px / md=96px / lg=128px
+          </p>
+        </div>
+      </Section>
+
+      {/* ── CARD SELECAO CENARIO ANALISE ── */}
+      <Section title="CardSelecaoCenarioAnalise">
+        <p className="text-xs text-muted-foreground mb-4">
+          Seletor de cenario para analises de derivativos. Tres estrategias — Conservador, Moderado e Agressivo —
+          com o cenario central destacado como recomendado. Botao de selecao segue o mesmo padrao visual do{" "}
+          <code className="font-mono bg-muted px-1 rounded">LoginCard</code>.
+        </p>
+        <div
+          className="rounded-2xl p-8 md:p-12"
+          style={{
+            background: "linear-gradient(135deg, oklch(0.08 0.03 145), oklch(0.14 0.04 145), oklch(0.10 0.025 90))",
+          }}
+        >
+          <CardSelecaoCenarioAnalise />
+        </div>
+        <div className="mt-3 p-3 bg-muted rounded-lg">
+          <p className="text-xs font-mono text-muted-foreground">
+            bg: #081F0F &nbsp;·&nbsp;
+            borda destaque: --accent/30 &nbsp;·&nbsp;
+            metrica: --accent &nbsp;·&nbsp;
+            botao: padrao LoginCard (border-white/10 + hover slide)
+          </p>
+        </div>
+      </Section>
+
+      {/* ── CHATMESSAGE ── */}
+      <Section title="ChatMessage">
+        <p className="text-xs text-muted-foreground mb-4">
+          Bolha de mensagem para o Assistente IA. Mensagens do assistente aparecem a esquerda com avatar verde; mensagens do usuario aparecem a direita com avatar accent. O cursor pulsante indica streaming em progresso.
+        </p>
+        <div className="rounded-[var(--radius-xl)] border border-border bg-card overflow-hidden max-w-2xl">
+          <ChatMessage role="ai" content="Ola! Sou o Assistente AgroComex. Posso analisar suas solicitacoes de derivativos, comparar cenarios Black-Scholes e responder perguntas sobre commodities. Como posso ajudar?" />
+          <ChatMessage role="human" content="Qual cenario foi recomendado na analise de soja de hoje?" />
+          <ChatMessage role="ai" content="Na ultima analise de soja (ID 47), o cenario Moderado foi recomendado pelo modelo. Preco de exercicio: R$ 132,50/60kg, premio de 2,4% e ponto de equilibrio em R$ 129,34. Deseja ver os detalhes completos?" />
+          <ChatMessage role="human" content="Sim, quero comparar com o cenario conservador." />
+          <ChatMessage role="ai" content="Comparando os cenarios..." isStreaming />
+        </div>
+        <div className="mt-3 p-3 bg-muted rounded-lg">
+          <p className="text-xs font-mono text-muted-foreground">
+            ai: bg --primary / text --primary-foreground (avatar esquerda) &nbsp;·&nbsp;
+            human: bg --primary / text --primary-foreground (avatar --accent) &nbsp;·&nbsp;
+            isStreaming: cursor animate-pulse inline-block
+          </p>
+        </div>
+      </Section>
+
+      {/* ── CHATINTERFACE (MOCK ESTATICO) ── */}
+      <Section title="ChatInterface">
+        <p className="text-xs text-muted-foreground mb-4">
+          Interface completa de chat com streaming SSE. O componente real chama <code className="font-mono bg-muted px-1 rounded">createConversation</code> no mount e <code className="font-mono bg-muted px-1 rounded">streamMessage</code> a cada envio. Abaixo: preview estatico do layout.
+        </p>
+        <div className="rounded-[var(--radius-xl)] border border-border bg-card overflow-hidden max-w-2xl" style={{ height: 440 }}>
+          <div className="flex flex-col h-full">
+            <div className="flex-1 overflow-y-auto">
+              <ChatMessage role="ai" content="Faca uma pergunta sobre suas analises de derivativos." />
+              <ChatMessage role="human" content="Qual o lucro maximo estimado no cenario agressivo?" />
+              <ChatMessage role="ai" content="No cenario agressivo da sua ultima analise, o lucro maximo estimado e de R$ 8.400,00 por contrato (500 sacas), considerando preco de exercicio a R$ 140,00/60kg e vencimento em julho/2025." />
+            </div>
+            <div className="border-t border-[var(--border)] p-4">
+              <div className="flex gap-2">
+                <div className="flex-1 h-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background)] px-3 flex items-center">
+                  <span className="text-sm text-[var(--muted-foreground)]">Pergunte sobre suas analises...</span>
+                </div>
+                <div className="h-10 w-10 rounded-[var(--radius-md)] bg-[var(--primary)] flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--primary-foreground)]"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 p-3 bg-muted rounded-lg">
+          <p className="text-xs font-mono text-muted-foreground">
+            rota: /chat &nbsp;·&nbsp; query: ?analise_id=N &nbsp;·&nbsp;
+            stream: POST /api/v1/chat/stream/ SSE &nbsp;·&nbsp;
+            container: --card + --radius-xl + border --border &nbsp;·&nbsp;
+            input: --background + --border
+          </p>
         </div>
       </Section>
 
