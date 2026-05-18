@@ -10,4 +10,5 @@ urlpatterns = [
     path("api/v1/", include("meses_contrato_futuro.urls")),
     path("api/v1/", include("tipos_derivativo.urls")),
     path("api/v1/", include("usuario.urls")),
+    path("api/v1/", include("chatbot.urls")),
 ]
