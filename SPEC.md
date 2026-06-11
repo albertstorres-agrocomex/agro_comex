@@ -18,6 +18,14 @@ agro_comex/
 | landing_page | Vercel | `main` | `hml` |
 | frontend | Vercel | `main` | `hml` |
 | backend | Render | `main` | `hml` |
+| banco de dados | Neon (serverless PostgreSQL) | projeto `agro-comex-prod` | — |
+
+### Configuracao do banco de producao (Neon)
+
+- Conexao via `DATABASE_URL` (env var no Render).
+- SSL obrigatorio (`sslmode=require` ja incluso na connection string do Neon).
+- Extensao `pgvector` habilitada manualmente no SQL Editor do Neon antes do primeiro deploy.
+- Migrations aplicadas automaticamente pelo `build.sh` a cada deploy.
 
 ## URLs
 
@@ -45,6 +53,10 @@ agro_comex/
 | agrobr | — | Cliente B3 (futuros) e CEPEA (precos) |
 | pandas | — | Normalizacao de DataFrames na camada de limpeza de dados |
 | python-decouple | 3.8 | Gerenciamento de variaveis de ambiente |
+| langchain + langchain-openai | 0.3.25 / 0.3.18 | Agent LLM com tool calling |
+| openai | 1.82.0 | GPT-4o-mini (chat streaming) + text-embedding-3-small (RAG) |
+| pgvector | 0.4.2 | Campo VectorField + busca coseno no Django ORM |
+| uvicorn | 0.34.3 | Servidor ASGI para endpoints SSE |
 
 ### Configuracoes relevantes
 
@@ -54,7 +66,7 @@ agro_comex/
 - **Timezone:** `America/Sao_Paulo`
 - **Idioma:** `pt-br`
 - **DRF renderers/parsers:** JSONRenderer e JSONParser apenas
-- **Autenticacao:** nao configurada explicitamente — pendente antes de producao
+- **Autenticacao:** JWT via `djangorestframework-simplejwt` — access token 15 min (body), refresh token 7 dias (cookie HttpOnly), rotacao + blacklist
 
 ### Apps Django
 
@@ -67,6 +79,8 @@ agro_comex/
 | `analises` | Solicitacoes, resultados, cenarios e curva de resultado de analise de risco |
 | `usuario` | Extensao do Usuario Django |
 | `authentication` | Autenticacao JWT (login, refresh, logout, perfil) |
+| `chatbot` | Assistente IA: LangChain Agent + SSE + RAG (pgvector) |
+| `core` | Configuracoes globais e URLs raiz do projeto |
 
 ### Modelos de Dados
 
@@ -151,35 +165,36 @@ Regra de validacao: `posicao` e `nivel_barreira` sao obrigatorios se o `TipoDeri
 |---|---|---|
 | solicitacao | ForeignKey (SolicitacaoAnalise) | CASCADE |
 | premio_calculado | IntegerField (null) | Preco da opcao calculado pelo Black-Scholes, em centavos |
-| percentual_premio | DecimalField(8,4) (null) | Premio como percentual do preco de mercado atual |
+| percentual_premio | DecimalField(12,4) (null) | Premio como percentual do preco de mercado atual |
 | valor_total_contrato | IntegerField (null) | Premio multiplicado pela quantidade de sacas, em centavos |
 | lucro_maximo | IntegerField (null) | (strike - premio) * qtd para put; null para call |
 | volatilidade_utilizada | DecimalField(8,6) (null) | Volatilidade historica anualizada (ultimos 252 pregoes) |
 | taxa_juros_utilizada | DecimalField(8,6) (null) | Taxa SELIC anual em decimal (ex: 0.1075 para 10,75%) |
-| dados_brutos | JSONField (null) | Parametros intermediarios: d1, d2, S, K, T, r, sigma |
-| cenario_escolhido | ForeignKey (CenarioAnalise) (null) | Cenario selecionado pelo usuario como preferido |
+| d1 | DecimalField(12,6) (null) | Parametro d1 da formula Black-Scholes |
+| d2 | DecimalField(12,6) (null) | Parametro d2 da formula Black-Scholes |
 | calculado_em | DateTimeField | auto_now_add |
 
 #### `analises.CenarioAnalise`
 | Campo | Tipo | Obs |
 |---|---|---|
-| resultado | ForeignKey (ResultadoAnalise) | CASCADE |
-| strike | IntegerField | Preco de exercicio do cenario em centavos |
-| premio_calculado | IntegerField | Premio Black-Scholes para este strike, em centavos |
-| percentual_premio | DecimalField(8,4) | Premio como % do preco de mercado |
-| valor_total_contrato | IntegerField | Premio * quantidade_sacas, em centavos |
-| lucro_maximo | IntegerField (null) | Apenas para put; null para call |
-| recomendado | BooleanField | True se for o cenario recomendado pelo sistema |
-| escolhido | BooleanField | True se o usuario selecionou este cenario (exclusivo por resultado) |
-| criado_em | DateTimeField | auto_now_add |
+| resultado | ForeignKey (ResultadoAnalise) | CASCADE, related_name="cenarios" |
+| nome | CharField(20) | choices: conservador / moderado / agressivo / proposto |
+| preco_exercicio_centavos | IntegerField | Strike do cenario em centavos |
+| premio_centavos | IntegerField | Premio Black-Scholes para este strike, em centavos |
+| e_recomendado | BooleanField | True se for o cenario recomendado pelo sistema; default False |
+| escolhido_pelo_usuario | BooleanField | True se o usuario selecionou este cenario; default False |
+| escolhido_em | DateTimeField (null) | Momento em que o usuario escolheu o cenario |
+
+Unique: `(resultado, nome)`. O cenario `proposto` usa o `preco_exercicio` informado diretamente pelo usuario; os outros tres sao gerados automaticamente (K-10%, K, K+10% do preco de mercado).
 
 #### `analises.PontoCurvaResultado`
 | Campo | Tipo | Obs |
 |---|---|---|
-| cenario | ForeignKey (CenarioAnalise) | CASCADE |
-| preco_ativo | IntegerField | Preco do ativo no ponto da curva, em centavos |
-| resultado_financeiro | IntegerField | Lucro/prejuizo no ponto, em centavos |
-| ordem | SmallIntegerField | Indice de ordenacao do ponto na curva |
+| cenario | ForeignKey (CenarioAnalise) | CASCADE, related_name="pontos_curva" |
+| preco_centavos | IntegerField | Preco do ativo no ponto da curva, em centavos |
+| resultado_centavos | IntegerField | Lucro/prejuizo no ponto, em centavos |
+
+Ordering padrao: `preco_centavos` (ASC).
 
 ### Endpoints REST
 
@@ -202,6 +217,9 @@ Todos os recursos seguem o padrao ModelViewSet (CRUD completo):
 | Refresh Token | `authentication/token/refresh/` | POST |
 | Logout | `authentication/logout/` | POST |
 | Perfil | `authentication/me/` | GET, PATCH |
+| Criar conversa | `chat/conversations/` | POST |
+| Detalhe de conversa | `chat/conversations/{uuid}/` | GET |
+| Stream de mensagem (SSE) | `chat/stream/` | POST |
 
 Exemplo:
 - `GET /api/v1/commodities/` — lista
@@ -226,9 +244,15 @@ POST /api/v1/solicitacao_analise/
   -> worker: status = concluido
   -> em caso de excecao: retry ate 3x, depois status = erro
 
+PATCH /api/v1/dados/analises/<id>/aprovar/
+  -> exige status=concluido; transiciona para aprovado; retorna HTTP 409 se estado invalido
+
+PATCH /api/v1/dados/analises/<id>/reprovar/
+  -> exige status=concluido; transiciona para rejeitado; retorna HTTP 409 se estado invalido
+
 PATCH /api/v1/cenarios/{id}/escolher/
-  -> desativa escolhido=True de todos os cenarios do mesmo ResultadoAnalise
-  -> marca escolhido=True no cenario alvo
+  -> desativa escolhido_pelo_usuario=True de todos os cenarios do mesmo ResultadoAnalise
+  -> marca escolhido_pelo_usuario=True e registra escolhido_em no cenario alvo
 ```
 
 ### Fluxo de atualizacao de dados de mercado (periodico)
@@ -276,6 +300,57 @@ O pior resultado prevalece (`INVALIDO > SUSPEITO > OK`). Multiplos motivos sao c
 | `dados` | Validacao | `dados/validacao/qualidade.py` | QualidadeDado enum, validar_preco, validar_macro, validar_exportacao |
 | `dados` | Comando | `dados/management/commands/reset_dados_mercado.py` | Reset seletivo de tabelas de mercado |
 | `authentication` | Views | `authentication/views.py` | Login, refresh, logout, perfil — JWT com cookie HttpOnly |
+| `chatbot` | Views | `chatbot/views.py` | `ConversationCreateView`, `ChatStreamView` (async SSE) |
+| `chatbot` | Agent | `chatbot/agent.py` | `create_agent_executor` — LangChain Agent GPT-4o-mini com 2 tools |
+| `chatbot` | Tool 1 | `chatbot/tool_db.py` | `consultar_analises` — busca ORM com filtros por keyword |
+| `chatbot` | Tool 2 | `chatbot/tool_rag.py` | `busca_semantica` — pgvector CosineDistance top-5 |
+| `chatbot` | Embedding | `chatbot/embedding.py` | `build_embedding_content`, `compute_content_hash` |
+| `chatbot` | Task | `chatbot/tasks.py` | `reembedar_analise` — Celery, idempotente via SHA-256 |
+| `chatbot` | Signal | `chatbot/signals.py` | `post_save` em `SolicitacaoAnalise` -> `reembedar_analise.delay` |
+
+### Modelos do chatbot
+
+#### `chatbot.Conversation`
+| Campo | Tipo | Obs |
+|---|---|---|
+| id | UUIDField | PK, default=uuid4 |
+| user | ForeignKey (AUTH_USER_MODEL) | CASCADE |
+| created_at | DateTimeField | auto_now_add |
+
+#### `chatbot.ConversationMessage`
+| Campo | Tipo | Obs |
+|---|---|---|
+| conversation | ForeignKey (Conversation) | CASCADE, related_name="messages" |
+| role | CharField | choices: human / ai |
+| content | TextField | |
+| created_at | DateTimeField | auto_now_add, ordering=ASC |
+
+#### `chatbot.AnaliseEmbedding`
+| Campo | Tipo | Obs |
+|---|---|---|
+| analise | OneToOneField (SolicitacaoAnalise) | CASCADE, related_name="embedding" |
+| content | TextField | Texto estruturado que gerou o embedding |
+| content_hash | CharField(64) | SHA-256 do content — idempotencia |
+| embedding | VectorField(1536) | pgvector, modelo text-embedding-3-small |
+| embedded_at | DateTimeField | auto_now |
+
+Indice HNSW coseno criado via `RunSQL` na migration `0002_analise_embedding`.
+
+### Fluxo do chatbot (SSE)
+
+```
+1. Frontend: POST /api/v1/chat/conversations/ -> UUID da conversa
+2. Usuario digita mensagem -> POST /api/v1/chat/stream/ {conversation_id, message}
+3. ChatStreamView:
+   a. Valida auth (401) e propriedade da conversa (403/404)
+   b. Carrega historico como HumanMessage/AIMessage
+   c. create_agent_executor(request.user)
+   d. astream_events(version="v2") -> filtra on_chat_model_stream
+   e. yield "data: {content}\n\n" a cada chunk
+   f. finally: acreate() human + ai messages
+   g. yield "data: [DONE]\n\n"
+4. Frontend: onChunk() atualiza ultima mensagem AI; onDone() desativa streaming
+```
 
 ---
 
@@ -295,6 +370,21 @@ Ver `FRONTEND_TECHNICAL_DOC.md` para documentacao completa de componentes, token
 | LineChartComex | Recharts | Grafico de linha com linha de tendencia |
 | PieChartComex | Recharts | Donut chart com legenda lateral |
 | WorldMapComex | react-simple-maps | Mapa coropletico mundial interativo |
+
+### Componentes do Chatbot
+
+| Componente | Arquivo | Descricao |
+|---|---|---|
+| ChatMessage | `components/system/chat/ChatMessage.tsx` | Mensagem individual (human/ai) com cursor pulsante |
+| ChatInterface | `components/system/chat/ChatInterface.tsx` | Interface completa: SSE, estado, scroll automatico |
+| ChatPage | `app/chat/page.tsx` | Wrapper Suspense + leitura de analise_id via useSearchParams |
+
+### Rotas do frontend
+
+| Rota | Descricao |
+|---|---|
+| `/chat` | Assistente IA — aceita `?analise_id={id}` como contexto |
+| `/analises/[id]` | Detalhe com botao "Discutir no chat" que navega para `/chat?analise_id={id}` |
 
 ### Design System
 
