@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from analises.models import SolicitacaoAnalise, ResultadoAnalise, CenarioAnalise, PontoCurvaResultado
+from analises.price_utils import usd_para_centavos, centavos_para_usd
 from meses_contrato_futuro.models import MesContratoFurturo as MesContratoFurturoModel
 
 
@@ -11,6 +12,7 @@ class SolicitacaoAnaliseCreateSerializer(serializers.ModelSerializer):
         required=True,
     )
     preco_exercicio = serializers.IntegerField(required=True, min_value=1)
+    nivel_barreira = serializers.FloatField(required=False, allow_null=True, min_value=0)
     quantidade = serializers.IntegerField(write_only=True, required=True, min_value=1)
     unidade_quantidade = serializers.ChoiceField(
         choices=["sacas", "toneladas"],
@@ -79,6 +81,9 @@ class SolicitacaoAnaliseCreateSerializer(serializers.ModelSerializer):
         )
         preco = ultimo if ultimo is not None else 0
 
+        if validated_data.get("nivel_barreira") is not None:
+            validated_data["nivel_barreira"] = usd_para_centavos(validated_data["nivel_barreira"])
+
         return SolicitacaoAnalise.objects.create(
             usuario=perfil,
             preco_mercado_atual=preco,
@@ -92,6 +97,7 @@ class SolicitacaoAnaliseReadSerializer(serializers.ModelSerializer):
 
     preco_mercado_atual = serializers.SerializerMethodField()
     preco_exercicio = serializers.SerializerMethodField()
+    nivel_barreira = serializers.SerializerMethodField()
     commodity_nome = serializers.CharField(source="commodity.nome", read_only=True)
     commodity_codigo = serializers.CharField(source="commodity.codigo", read_only=True)
     commodity_moeda = serializers.CharField(source="commodity.moeda", read_only=True)
@@ -105,14 +111,13 @@ class SolicitacaoAnaliseReadSerializer(serializers.ModelSerializer):
     mes_contrato_ticket = serializers.CharField(source="mes_contrato.ticket_completo", read_only=True)
 
     def get_preco_mercado_atual(self, obj):
-        if obj.preco_mercado_atual is None:
-            return None
-        return round(obj.preco_mercado_atual / 100, 2)
+        return centavos_para_usd(obj.preco_mercado_atual)
 
     def get_preco_exercicio(self, obj):
-        if obj.preco_exercicio is None:
-            return None
-        return round(obj.preco_exercicio / 100, 2)
+        return centavos_para_usd(obj.preco_exercicio)
+
+    def get_nivel_barreira(self, obj):
+        return centavos_para_usd(obj.nivel_barreira)
 
     class Meta:
         model = SolicitacaoAnalise
@@ -148,10 +153,10 @@ class PontoCurvaResultadoSerializer(serializers.ModelSerializer):
     resultado = serializers.SerializerMethodField()
 
     def get_preco(self, obj):
-        return round(obj.preco_centavos / 100, 2)
+        return centavos_para_usd(obj.preco_centavos)
 
     def get_resultado(self, obj):
-        return round(obj.resultado_centavos / 100, 2)
+        return centavos_para_usd(obj.resultado_centavos)
 
     class Meta:
         model  = PontoCurvaResultado
@@ -172,19 +177,19 @@ class CenarioAnaliseSerializer(serializers.ModelSerializer):
     pontos_curva     = PontoCurvaResultadoSerializer(many=True, read_only=True)
 
     def get_preco_exercicio(self, obj):
-        return round(obj.preco_exercicio_centavos / 100, 2)
+        return centavos_para_usd(obj.preco_exercicio_centavos)
 
     def get_premio(self, obj):
-        return round(obj.premio_centavos / 100, 2)
+        return centavos_para_usd(obj.premio_centavos)
 
     def get_valor_total(self, obj):
         qtd = obj.resultado.solicitacao.quantidade_sacas
         if qtd is None:
             return None
-        return round(obj.premio_centavos * qtd / 100, 2)
+        return centavos_para_usd(obj.premio_centavos * qtd)
 
     def get_ponto_equilibrio(self, obj):
-        return round((obj.preco_exercicio_centavos - obj.premio_centavos) / 100, 2)
+        return centavos_para_usd(obj.preco_exercicio_centavos - obj.premio_centavos)
 
     def get_fator(self, obj):
         return _FATORES_CENARIO.get(obj.nome)
@@ -209,19 +214,13 @@ class ResultadoAnaliseSerializer(serializers.ModelSerializer):
     cenarios              = CenarioAnaliseSerializer(many=True, read_only=True)
 
     def get_premio_calculado(self, obj):
-        if obj.premio_calculado is None:
-            return None
-        return round(obj.premio_calculado / 100, 2)
+        return centavos_para_usd(obj.premio_calculado)
 
     def get_valor_total_contrato(self, obj):
-        if obj.valor_total_contrato is None:
-            return None
-        return round(obj.valor_total_contrato / 100, 2)
+        return centavos_para_usd(obj.valor_total_contrato)
 
     def get_lucro_maximo(self, obj):
-        if obj.lucro_maximo is None:
-            return None
-        return round(obj.lucro_maximo / 100, 2)
+        return centavos_para_usd(obj.lucro_maximo)
 
     class Meta:
         model = ResultadoAnalise

@@ -8,6 +8,8 @@ MGS_CREDENCIAIS_INVALIDAS = "Credenciais invalidas."
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):  # corrigido: renomeado de CustomObtainPairSerializer
     """OWASP A07: falha de autenticacao sempre com mesma mensagem (evita user enumeration)."""
+    username_field = 'email'
+
     def validate(self, attrs):
         try:
             data = super().validate(attrs)

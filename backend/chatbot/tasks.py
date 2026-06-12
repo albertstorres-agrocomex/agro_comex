@@ -5,8 +5,6 @@ from analises.models import SolicitacaoAnalise
 from chatbot.models import AnaliseEmbedding
 from chatbot.embedding import build_embedding_content, compute_content_hash
 
-openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
-
 
 @shared_task
 def reembedar_analise(analise_id: int) -> None:
@@ -24,6 +22,7 @@ def reembedar_analise(analise_id: int) -> None:
     except AnaliseEmbedding.DoesNotExist:
         embedding_obj = AnaliseEmbedding(analise=analise)
 
+    openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
     vector = openai_client.embeddings.create(
         model="text-embedding-3-small",
         input=content,
