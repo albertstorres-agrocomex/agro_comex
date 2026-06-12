@@ -47,13 +47,14 @@ const neutralScale = [
 ];
 
 // ─── Sub-components ────────────────────────────────────────────────────────
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <section className="mb-16">
       <div className="flex items-center gap-4 mb-6">
         <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
         <div className="flex-1 h-px bg-border" />
       </div>
+      {subtitle && <p className="text-sm text-muted-foreground mb-4">{subtitle}</p>}
       {children}
     </section>
   );
