@@ -10,6 +10,7 @@ const bgImage = "/images/imagem_tela_login.jpg"
 
 const DRIVE_URL = "https://drive.google.com/drive/folders/1sfuOYIuZdYWmvefMX6Qs3aULYiqTZKS_"
 const GITHUB_URL = "https://github.com/albertstorres-agrocomex/agro_comex"
+const LANDING_URL = "https://agro-comex-landing.vercel.app/"
 
 function GoogleDriveIcon() {
   return (
@@ -20,6 +21,15 @@ function GoogleDriveIcon() {
       <path d="M43.65 25L57.4 1.2C56 .4 54.45 0 52.9 0H34.4c-1.55 0-3.1.4-4.5 1.2L43.65 25z" fill="#00832d"/>
       <path d="M59.8 53H27.5L13.75 76.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.1-.45 4.5-1.2z" fill="#2684fc"/>
       <path d="M73.4 26.5L59.65 2.7c-.8-1.4-1.9-2.5-3.3-3.3L43 25l16.8 28H86.1c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+    </svg>
+  )
+}
+
+function GlobeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
     </svg>
   )
 }
@@ -71,6 +81,16 @@ function TopNav() {
             >
               <GitHubIcon />
               <span>GitHub</span>
+            </a>
+            <a
+              href={LANDING_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-sm font-medium text-white backdrop-blur-sm transition-all duration-200 hover:bg-white/20 hover:border-white/40"
+              title="Abrir Landing Page"
+            >
+              <GlobeIcon />
+              <span>Site</span>
             </a>
             <button
               onClick={() => setExpanded(false)}
