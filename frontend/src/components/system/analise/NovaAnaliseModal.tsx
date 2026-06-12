@@ -323,10 +323,10 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
               <Input
                 type="number"
                 min="0"
-                step="1"
+                step="0.01"
                 value={nivelBarreira}
                 onChange={(e) => setNivelBarreira(e.target.value)}
-                placeholder="Ex: 450"
+                placeholder="Ex: 5.90"
                 className="h-9 text-sm"
               />
             </div>

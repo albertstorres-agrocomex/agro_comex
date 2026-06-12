@@ -10,6 +10,12 @@
 - **URL producao:** https://agro-comex-landing.vercel.app
 - **Vercel inspect:** https://vercel.com/torres-projects-3f0de638/agro-comex-landing
 
+### Navbar
+
+A landing page possui uma barra de navegacao fixa no topo (`landing_page/src/app/page.tsx`) com:
+- Logo / nome do produto
+- Botao "Ver Projeto" que linka para o frontend da aplicacao principal
+
 ### Deploy manual
 ```bash
 cd landing_page
@@ -61,7 +67,9 @@ frontend/src/
     analises/
       page.tsx               # Lista paginada de analises — tabs por status, grafico donut, botao Nova Analise
       [id]/
-        page.tsx             # Detalhe de analise — exibe campos e resultado; acoes aprovar/reprovar (so para em_analise)
+        page.tsx             # Detalhe de analise — exibe campos, resultado Black-Scholes, cenarios (conservador/moderado/agressivo/proposto) com curva de payoff; cenario proposto destacado com posicionamento e cor dinamicos; acoes aprovar/reprovar (so para concluido); botao "Discutir no chat" navega para /chat?analise_id={id}
+    chat/
+      page.tsx               # Assistente IA — ChatPage (Suspense wrapper) + ChatPageInner (le analise_id via useSearchParams); exibe contexto da analise quando presente; requer autenticacao
     login/
       page.tsx               # Redirect para `/`
     styleguide/
@@ -79,13 +87,26 @@ frontend/src/
     PieChartComex.tsx        # Componente de grafico de pizza/donut
     WorldMapComex.tsx        # Componente de mapa mundial coropletico
     RecentAnalysisCards.tsx  # Cards de analises recentes — link "Veja tudo" aponta para /analises
+    RecentAnalysisCard.tsx   # Card individual de analise recente
+    CommodityPriceCards.tsx  # Grid de cards de precos de mercado por commodity
+    CommodityPriceCard.tsx   # Card individual de preco de commodity
+    ExportIndexChart.tsx     # Grafico de indice de exportacao
     system/
       auth/
         LoginCard.tsx        # Card de login — prop error?: string (role="alert", text-destructive)
+        LoginCardNew.tsx     # Variante nova do card de login
       analise/
         AnaliseCard.tsx           # Card expansivel com badge de status e link para /analises/[id]
         AnaliseStatusPieChart.tsx # Grafico donut com distribuicao dos 4 status (usa PieChartComex)
-        NovaAnaliseModal.tsx      # Modal com formulario para criar nova analise
+        NovaAnaliseModal.tsx      # Modal com formulario para criar nova analise (preco_exercicio, quantidade, mes_contrato obrigatorios)
+      chat/
+        ChatMessage.tsx           # Mensagem individual (human/ai) com cursor pulsante de streaming
+        ChatInterface.tsx         # Interface completa do chat: estado, streaming SSE, scroll automatico
+      commodity/
+        CommodityImageCard.tsx    # Card de commodity com imagem
+      layout/
+        Sidebar.tsx          # Navegacao lateral da aplicacao
+        TopMenu.tsx          # Menu superior da aplicacao
     ui/                      # Componentes shadcn/ui tematizados
       card.tsx
       button.tsx
@@ -99,6 +120,8 @@ frontend/src/
   services/
     authService.ts           # Servico HTTP de auth: login(), refreshToken(), logout()
     analiseService.ts        # Servico HTTP de analises: 6 funcoes, 5 tipos TypeScript
+    commodityService.ts      # Servico HTTP de commodities: listagem, busca, selecao do usuario
+    chatService.ts           # Servico HTTP do chatbot: createConversation(), streamMessage() via SSE
   lib/
     utils.ts                 # cn() — merge de classes Tailwind
   types/
@@ -114,8 +137,10 @@ frontend/src/
 | `/` | Login |
 | `/login` | Redirect permanente para `/` |
 | `/dashboard` | Dashboard principal — requer autenticacao |
+| `/dashboard/commodities` | Selecao de commodities de interesse do usuario |
 | `/analises` | Lista paginada de analises — requer autenticacao |
-| `/analises/[id]` | Detalhe de analise — acoes de aprovacao/reprovacao |
+| `/analises/[id]` | Detalhe de analise — acoes de aprovacao/reprovacao; botao "Discutir no chat" |
+| `/chat` | Assistente IA — aceita `?analise_id={id}` como contexto opcional |
 | `/styleguide` | Design tokens — cores, tipografia, radii |
 | `/styleguide/components/bar-chart` | Showcase do BarChartComex |
 | `/styleguide/components/line-chart` | Showcase do LineChartComex |
@@ -467,7 +492,10 @@ interface AnaliseStatusCount {
 
 interface NovaAnalisePayload {
   commodity: number
-  quantidade_toneladas?: string
+  mes_contrato: number
+  preco_exercicio: number
+  quantidade: number
+  unidade_quantidade: "sacas" | "toneladas"
 }
 ```
 
@@ -513,7 +541,77 @@ Grafico donut com 4 fatias (pendente, em_analise, aprovado, rejeitado) usando `P
 
 **Arquivo:** `src/components/system/analise/NovaAnaliseModal.tsx`
 
-Modal acionado pelo botao "Nova Analise" na pagina `/analises`. Formulario com select de commodity (busca via `commodityService`) e campo opcional de quantidade em toneladas. Apos submit bem-sucedido fecha o modal e dispara refresh da lista.
+Modal acionado pelo botao "Nova Analise" na pagina `/analises`. Formulario com: select de commodity, select de mes de contrato, campo de preco de exercicio, campo de quantidade e radio de unidade (sacas/toneladas). Todos os campos sao obrigatorios. Validacao de NaN e precisao float aplicada antes do submit. Apos submit bem-sucedido fecha o modal e dispara refresh da lista.
+
+---
+
+## Modulo de Chat (Assistente IA)
+
+### chatService.ts
+
+**Arquivo:** `src/services/chatService.ts`
+
+Servico HTTP do chatbot. Usa `apiFetch` com Bearer token automatico.
+
+**`createConversation(analiseId?: number): Promise<{ id: string, created_at: string }>`**
+- `POST /api/v1/chat/conversations/`
+- Body: `{ analise_id }` se fornecido, caso contrario `{}`
+
+**`streamMessage(conversationId, message, onChunk, onDone): Promise<void>`**
+- `POST /api/v1/chat/stream/` com `{ conversation_id, message }`
+- Usa `res.body.getReader()` + `TextDecoder` para consumir SSE
+- Buffer acumula chunks, divide por `\n`, processa linhas `data: ...`
+- Chama `onChunk(content)` a cada chunk JSON valido; `onDone()` ao receber `[DONE]`
+
+---
+
+### ChatMessage
+
+**Arquivo:** `src/components/system/chat/ChatMessage.tsx`
+
+Props: `role: "human" | "ai"`, `content: string`, `isStreaming?: boolean`
+
+- Human: alinhado direita, badge "EU", `bg-[var(--primary)]`, texto `var(--primary-foreground)`
+- AI: alinhado esquerda, badge "IA", `bg-[var(--secondary)]`
+- Cursor pulsante (`animate-pulse`) quando `isStreaming=true`
+- Todos os tokens de cor via CSS custom properties
+
+---
+
+### ChatInterface
+
+**Arquivo:** `src/components/system/chat/ChatInterface.tsx`
+
+Props: `analiseId?: number`
+
+Estados: `conversationId`, `messages`, `input`, `isStreaming`, `error`
+
+Refs: `bottomRef` (auto-scroll) e `streamActiveRef` (guard de race condition)
+
+- `useEffect` de mount: `createConversation(analiseId)` com flag `cancelled` para evitar setState apos desmonte
+- `handleSend`: adiciona mensagem human, inicia stream SSE, acumula chunks na ultima mensagem AI preservando `id` estavel
+- Enter envia; Shift+Enter nao envia
+- `aria-label` em Input e Button para acessibilidade
+- `key={msg.id}` (UUID) em vez de index — key estavel durante streaming
+
+---
+
+### Pagina /chat
+
+**Arquivo:** `src/app/chat/page.tsx`
+
+- `ChatPage` exporta wrapper `<Suspense>` — obrigatorio no Next.js 15 App Router para `useSearchParams`
+- `ChatPageInner`: le `analise_id` via `useSearchParams` com validacao `!isNaN(Number(raw))`
+- Redireciona para `/login` se nao autenticado
+- Exibe "Contexto: analise #{analiseId}" quando `analise_id` presente na URL
+- `ChatInterface` em container com `rounded-[var(--radius-xl)]` e `border border-[var(--border)]`
+
+---
+
+### Sidebar — item "Assistente IA"
+
+Adicionado ao array `DEFAULT_NAV_ITEMS` em `Sidebar.tsx`:
+- Label: `"Assistente IA"`, href: `"/chat"`, icon: `Bot` (lucide-react)
 
 ---
 

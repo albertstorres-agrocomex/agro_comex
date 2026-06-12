@@ -1,12 +1,10 @@
 "use client"
 
-import { Cell, Pie, PieChart } from "recharts"
+import { Cell, Pie, PieChart, Tooltip } from "recharts"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
 import { cn } from "@/lib/utils"
@@ -57,15 +55,23 @@ export function PieChartComex({
         <div className="relative shrink-0">
           <ChartContainer config={config} className="h-[160px] w-[160px]">
             <PieChart>
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value) =>
-                      typeof value === "number" ? valueFormatter(value) : String(value)
-                    }
-                    nameKey="label"
-                  />
-                }
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const item = payload[0];
+                  const color = item.payload?.fill ?? "var(--muted)";
+                  return (
+                    <div className="rounded-[var(--radius-md)] border border-border bg-popover px-3 py-2 shadow-md text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                        <span className="font-medium text-popover-foreground">{item.name}</span>
+                      </div>
+                      <div className="mt-1 font-mono font-semibold text-popover-foreground">
+                        {typeof item.value === "number" ? valueFormatter(item.value) : item.value}
+                      </div>
+                    </div>
+                  );
+                }}
               />
               <Pie
                 data={data.map((d) => ({ ...d, name: d.label }))}
@@ -110,7 +116,7 @@ export function PieChartComex({
               <div className="flex min-w-0 items-center gap-1.5">
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: `var(--color-${item.colorKey})` }}
+                  style={{ backgroundColor: (config[item.colorKey] as { color?: string })?.color }}
                 />
                 <span className="truncate text-muted-foreground">{item.label}</span>
               </div>

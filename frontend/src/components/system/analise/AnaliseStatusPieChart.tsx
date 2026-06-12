@@ -31,10 +31,10 @@ export function AnaliseStatusPieChart({ counts }: Props) {
     <PieChartComex
       data={data}
       config={config}
-
       totalValue={String(counts.total)}
       totalLabel="Total"
       valueFormatter={(v) => String(v)}
+      className="h-full border-0 shadow-none bg-transparent"
     />
   );
 }

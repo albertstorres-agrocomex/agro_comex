@@ -44,6 +44,7 @@ export default function AnalisesPage() {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
   const PAGE_SIZE = 6;
@@ -56,10 +57,13 @@ export default function AnalisesPage() {
 
   const loadAnalises = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await fetchSolicitacoes(page, activeTab);
       setAnalises(data.results);
       setTotalCount(data.count);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Erro ao carregar analises");
     } finally {
       setLoading(false);
     }
@@ -126,10 +130,13 @@ export default function AnalisesPage() {
         }}
       >
         {/* Coluna esquerda */}
-        <div className="flex flex-col min-h-0 rounded-[var(--radius-2xl)] border border-border bg-card overflow-hidden">
+        <div className="flex flex-col min-h-0 rounded-[var(--radius-2xl)] bg-background overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-border">
+          <div className="flex items-center justify-between px-4 py-3 shrink-0">
             <h1 className="text-base font-bold text-foreground">Suas Analises</h1>
+            {loadError && (
+              <span className="text-xs text-destructive font-medium">{loadError}</span>
+            )}
             <button
               onClick={() => setModalOpen(true)}
               className="bg-info text-info-foreground px-4 py-2 rounded-full text-sm font-semibold hover:brightness-105 transition-all"
@@ -139,7 +146,7 @@ export default function AnalisesPage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center gap-1 px-4 py-2 shrink-0 border-b border-border overflow-x-auto">
+          <div className="flex items-center gap-1 px-4 py-2 shrink-0 overflow-x-auto">
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.key}
@@ -193,8 +200,8 @@ export default function AnalisesPage() {
         {/* Coluna direita */}
         <div className="flex flex-col gap-2.5 min-h-0">
           {/* Grafico de status */}
-          <div className="flex-1 rounded-[var(--radius-2xl)] border border-border bg-card overflow-hidden flex flex-col">
-            <div className="px-4 py-3 shrink-0 border-b border-border">
+          <div className="flex-1 rounded-[var(--radius-2xl)] bg-background overflow-hidden flex flex-col">
+            <div className="px-4 py-3 shrink-0">
               <h2 className="text-base font-bold text-foreground">Distribuicao</h2>
             </div>
             <div className="flex-1 p-4">
@@ -208,7 +215,7 @@ export default function AnalisesPage() {
 
           {/* Placeholder inferior */}
           <div
-            className="rounded-[var(--radius-2xl)] border border-border bg-card shrink-0"
+            className="rounded-[var(--radius-2xl)] bg-background shrink-0"
             style={{ height: "calc((100vh - 120px) / 3 - 10px)" }}
           />
         </div>

@@ -115,7 +115,7 @@ export async function fetchSolicitacoes(
   const params = new URLSearchParams({ page: String(page) });
   if (status && status !== "todos") params.set("status", status);
   const res = await apiFetch(`${BASE}/solicitacao_analise/?${params}`);
-  if (!res.ok) throw new Error("Erro ao buscar solicitacoes");
+  if (!res.ok) throw new Error(`Erro ao buscar solicitacoes (${res.status})`);
   return res.json();
 }
 
@@ -164,7 +164,7 @@ export async function escolherCenario(cenarioId: number): Promise<CenarioAnalise
   const res = await apiFetch(`${BASE}/cenarios/${cenarioId}/escolher/`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ escolhido_pelo_usuario: true }),
   });
   if (!res.ok) throw new Error("Erro ao escolher cenario");
   return res.json();

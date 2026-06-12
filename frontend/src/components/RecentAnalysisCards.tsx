@@ -38,8 +38,10 @@ function toRecentAnalysisData(a: SolicitacaoAnaliseData): RecentAnalysisData {
     title: `${a.commodity_nome} — ${a.tipo_derivativo_rotulo}`,
     status: a.status === "aguardando" ? "pendente"
           : a.status === "processando" ? "em_analise"
-          : a.status === "concluido" ? "aprovado"
-          : "rejeitado",
+          : a.status === "concluido" ? "concluido"
+          : a.status === "aprovado" ? "aprovado"
+          : a.status === "rejeitado" ? "rejeitado"
+          : "erro",
     salePrice: a.preco_mercado_atual,
     salePriceCurrency: a.commodity_moeda,
     salePriceUnit: a.commodity_unidade,
@@ -65,7 +67,7 @@ export function RecentAnalysisCards({ className }: RecentAnalysisCardsProps) {
         if (!res.ok) throw new Error("fetch failed")
         return res.json() as Promise<{ results: SolicitacaoAnaliseData[] }>
       })
-      .then((data) => setAnalises(data.results.map(toRecentAnalysisData)))
+      .then((data) => setAnalises(data.results.slice(0, 4).map(toRecentAnalysisData)))
       .catch(() => setAnalises([]))
       .finally(() => setLoading(false))
   }, [])

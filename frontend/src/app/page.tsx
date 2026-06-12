@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { LoginCard } from "@/components/system/auth/LoginCard"
 import { useAuth } from "@/contexts/AuthContext"
-import bgImage from "../../screen_shots/imagem_tela_login.jpg"
+
+const bgImage = "/images/imagem_tela_login.jpg"
 
 const DRIVE_URL = "https://drive.google.com/drive/folders/1sfuOYIuZdYWmvefMX6Qs3aULYiqTZKS_"
 const GITHUB_URL = "https://github.com/albertstorres-agrocomex/agro_comex"

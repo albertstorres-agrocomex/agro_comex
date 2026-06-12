@@ -1,31 +1,23 @@
 "use client";
 
+import React, { useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { SolicitacaoAnaliseData } from "@/services/analiseService";
 
-const STATUS_CONFIG = {
-  aguardando: {
-    label: "Aguardando",
-    style: { background: "var(--warning)", color: "var(--warning-foreground)" },
-  },
-  processando: {
-    label: "Processando",
-    style: { background: "var(--info)", color: "var(--info-foreground)" },
-  },
-  concluido: {
-    label: "Concluido",
-    style: { background: "var(--success)", color: "var(--success-foreground)" },
-  },
-  erro: {
-    label: "Erro",
-    style: {
-      background: "var(--destructive)",
-      color: "var(--destructive-foreground)",
-    },
-  },
+const BADGE_STYLE: React.CSSProperties = {
+  background: "var(--muted)",
+  color: "var(--muted-foreground)",
+};
+
+const STATUS_CONFIG: Record<string, { label: string; style: React.CSSProperties }> = {
+  aguardando:  { label: "Aguardando",  style: BADGE_STYLE },
+  processando: { label: "Processando", style: BADGE_STYLE },
+  concluido:   { label: "Concluido",   style: BADGE_STYLE },
+  aprovado:    { label: "Aprovado",    style: BADGE_STYLE },
+  rejeitado:   { label: "Rejeitado",   style: BADGE_STYLE },
+  erro:        { label: "Erro",        style: BADGE_STYLE },
 };
 
 interface Props {
@@ -34,7 +26,10 @@ interface Props {
 
 export function AnaliseCard({ analise }: Props) {
   const [isOpen, setIsOpen] = useState(false);
-  const cfg = STATUS_CONFIG[analise.status];
+  const cfg = STATUS_CONFIG[analise.status] ?? {
+    label: analise.status,
+    style: { background: "var(--muted)", color: "var(--muted-foreground)" },
+  };
 
   const mesLabel =
     analise.mes_contrato_ticket ??
@@ -101,7 +96,8 @@ export function AnaliseCard({ analise }: Props) {
             {/* Botao expandir */}
             <button
               onClick={() => setIsOpen((v) => !v)}
-              className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center transition-opacity hover:opacity-80 bg-muted/15"
+              className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center transition-opacity hover:opacity-80"
+              style={cfg.style}
               aria-label={isOpen ? "Recolher" : "Expandir"}
             >
               {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}

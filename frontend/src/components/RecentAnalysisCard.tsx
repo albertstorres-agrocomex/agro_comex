@@ -13,7 +13,7 @@ export interface RecentAnalysisData {
   commodityTextColor: string
   imageUrl?: string
   title: string
-  status: "aprovado" | "pendente" | "rejeitado" | "em_analise"
+  status: "aprovado" | "pendente" | "rejeitado" | "em_analise" | "concluido" | "erro"
   salePrice: number
   salePriceCurrency: string
   salePriceUnit: string
@@ -24,23 +24,15 @@ export interface RecentAnalysisData {
   timeAgo: string
 }
 
+const BADGE_STYLE = { background: "var(--muted)", color: "var(--muted-foreground)" }
+
 const STATUS_CONFIG = {
-  aprovado: {
-    label: "Aprovado",
-    style: { background: "var(--success)", color: "var(--success-foreground)" },
-  },
-  pendente: {
-    label: "Pendente",
-    style: { background: "var(--warning)", color: "var(--warning-foreground)" },
-  },
-  rejeitado: {
-    label: "Rejeitado",
-    style: { background: "var(--destructive)", color: "var(--destructive-foreground)" },
-  },
-  em_analise: {
-    label: "Em Analise",
-    style: { background: "var(--info)", color: "var(--info-foreground)" },
-  },
+  aprovado:   { label: "Aprovado",   style: BADGE_STYLE },
+  pendente:   { label: "Pendente",   style: BADGE_STYLE },
+  rejeitado:  { label: "Rejeitado",  style: BADGE_STYLE },
+  em_analise: { label: "Em Analise", style: BADGE_STYLE },
+  concluido:  { label: "Concluido",  style: BADGE_STYLE },
+  erro:       { label: "Erro",       style: BADGE_STYLE },
 } as const
 
 export function RecentAnalysisCard({ analysis }: { analysis: RecentAnalysisData }) {

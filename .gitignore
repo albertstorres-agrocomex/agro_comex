@@ -1,5 +1,12 @@
 # Local dev folders
 login-8/
+frontend/screen_shots/
+
+# SR1 planning docs
+sr1/pf_pm_sr1.md
+sr1/gerar_slides.py
+sr1/apresentacao_sr1.pptx
+docs/superpowers/
 
 # Dependencies
 node_modules/
@@ -55,8 +62,9 @@ Thumbs.db
 .claude/*.local.json
 .claude/*.local.md
 
-# Planos de implementacao (gerados por agentes)
+# Planos de implementacao e specs (gerados por agentes)
 docs/superpowers/plans/
+docs/superpowers/specs/
 
 # Project rules and technical docs (AI agents)
 CLAUDE.md
@@ -67,3 +75,9 @@ FRONTEND_TECHNICAL_DOC.md
 SOLUCOES_SEMELHANTES.md
 IMPLEMENTACAO_REDIS_E_CELERY.md
 EXPLICACAO_LIMPEZA_BUSCA.md
+docs/explicacao_grafico_curva_resultado.md
+RESUMO_AVD_PRESENCIAL.md
+Aula 03 - Critérios para o SR1.pdf
+DEBATE_IMPLEMENTACAO_CHATBOT.md
+IMPLEMENTAÇÃO_CHATBOT.md
+README_MAURO.md

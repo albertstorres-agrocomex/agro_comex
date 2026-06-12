@@ -102,13 +102,13 @@
   --chart-5: oklch(0.60 0.12 185);             /* teal */
 
   /* === SIDEBAR — dark panel === */
-  --sidebar: oklch(0.155 0.012 65);            /* very dark warm #1A1710 */
+  --sidebar: oklch(0.10 0.038 145);            /* Primary 950 #081F0F */
   --sidebar-foreground: oklch(0.90 0.008 85);
   --sidebar-primary: oklch(0.87 0.185 125);    /* lime accent on dark */
   --sidebar-primary-foreground: oklch(0.18 0.07 130);
-  --sidebar-accent: oklch(0.22 0.015 68);
+  --sidebar-accent: oklch(0.18 0.025 145);     /* green-tinted hover */
   --sidebar-accent-foreground: oklch(0.88 0.008 85);
-  --sidebar-border: oklch(0.24 0.012 68);
+  --sidebar-border: oklch(0.22 0.022 145);     /* green-tinted border */
   --sidebar-ring: oklch(0.26 0.068 145);
 
   /* === SEMANTIC COLORS === */
@@ -155,11 +155,11 @@
   --chart-4: oklch(0.68 0.19 280);
   --chart-5: oklch(0.64 0.14 185);
 
-  --sidebar: oklch(0.12 0.010 65);
+  --sidebar: oklch(0.10 0.038 145);            /* Primary 950 #081F0F */
   --sidebar-foreground: oklch(0.90 0.008 80);
   --sidebar-primary: oklch(0.87 0.185 125);
   --sidebar-primary-foreground: oklch(0.18 0.07 130);
-  --sidebar-accent: oklch(0.20 0.012 68);
+  --sidebar-accent: oklch(0.16 0.022 145);
   --sidebar-accent-foreground: oklch(0.88 0.008 80);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.60 0.15 145);
@@ -179,4 +179,12 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Sidebar token override — garante que Primary 950 (#081F0F) vence os defaults do shadcn */
+:root {
+  --sidebar: oklch(0.10 0.038 145);
+}
+.dark {
+  --sidebar: oklch(0.10 0.038 145);
 }

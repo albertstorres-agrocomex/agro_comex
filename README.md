@@ -35,11 +35,15 @@ Plataforma de inteligencia de mercado para o agronegocio brasileiro. Consolida d
 | PostgreSQL | 15+ | Banco de dados relacional |
 | django-celery-beat | 2.9.0 | Agendamento de tarefas (cron) |
 | django-celery-results | 2.6.0 | Persistencia de resultados de tarefas |
+| LangChain + langchain-openai | 0.3.25 / 0.3.18 | Agent LLM com tool calling |
+| OpenAI SDK | 1.82.0 | GPT-4o-mini (chat) e text-embedding-3-small (RAG) |
+| pgvector | 0.4.2 | Busca semantica por similaridade coseno no PostgreSQL |
+| uvicorn | 0.34.3 | Servidor ASGI para endpoints SSE (producao) |
 
 ### Frontend
 | Tecnologia | Versao | Funcao |
 |-----------|--------|--------|
-| Next.js | 16.1.6 | React framework (app) |
+| Next.js | 16.1.6 | React framework (app) |_page, o botão 
 | React | 19.2.3 | UI library |
 | TypeScript | 5 | Tipagem estatica |
 | Tailwind CSS | 4 | Estilizacao utilitaria |
@@ -58,9 +62,11 @@ agro_comex/
 │   ├── commodities/            # Catalogo de commodities
 │   ├── tipos_derivativo/       # Tipos de derivativos e parametros
 │   ├── meses_contrato_futuro/  # Calendarios de contratos futuros
-│   ├── dados/                  # Cache de dados de mercado
-│   ├── analises/               # Solicitacoes e resultados de analises
+│   ├── dados/                  # Cache de dados de mercado e macroeconomicos
+│   ├── analises/               # Solicitacoes, resultados, cenarios e curva de payoff
 │   ├── usuario/                # Perfil de usuario
+│   ├── authentication/         # Autenticacao JWT (login, refresh, logout, perfil)
+│   ├── chatbot/                # Assistente IA: LangChain Agent + SSE + RAG (pgvector)
 │   ├── manage.py
 │   ├── requirements.txt
 │   └── .env.example
@@ -123,8 +129,8 @@ agro_comex/
 ### Fluxo de dados — Solicitacao de analise
 
 ```
-1. Frontend  →  POST /api/v1/solicitacao_analise/
-               (commodity, tipo_derivativo, parametros)
+1. Frontend  →  POST /api/v1/dados/analises/create/
+               (commodity, tipo_derivativo, preco_exercicio, quantidade, mes_contrato)
 
 2. API       →  cria SolicitacaoAnalise [status: aguardando]
             →  enfileira processar_analise.delay(id)
@@ -133,12 +139,17 @@ agro_comex/
 
 4. Worker    →  consume a tarefa
             →  atualiza status para [processando]
-            →  executa calculo de preco/volatilidade
-            →  cria ResultadoAnalise no banco
+            →  executa Black-Scholes com 4 cenarios
+               (conservador, moderado, agressivo, proposto)
+            →  para cada cenario: calcula curva de payoff (25 pontos)
+            →  persiste ResultadoAnalise + CenarioAnalise[] + PontoCurvaResultado[]
             →  atualiza status para [concluido] ou [erro]
 
-5. Frontend  →  consulta GET /api/v1/solicitacao_analise/{id}/
+5. Frontend  →  consulta GET /api/v1/dados/analises/{id}/
             →  exibe resultado quando status == concluido
+
+6. Usuario   →  PATCH /api/v1/dados/analises/{id}/aprovar|reprovar/
+            →  status transiciona para [aprovado] ou [rejeitado]
 ```
 
 ### Fluxo de dados — Coleta periodica de mercado
@@ -165,6 +176,7 @@ agro_comex/
 | Sincrono | Frontend -> API -> PostgreSQL | Resposta imediata |
 | Assincrono | API -> Redis -> Worker -> PostgreSQL | Frontend consulta status |
 | Agendado | Beat -> Redis -> Worker -> APIs externas -> PostgreSQL | Background, sem interacao do usuario |
+| SSE (streaming) | Frontend -> API (ASGI) -> LangChain Agent -> OpenAI | Resposta progressiva em tempo real |
 
 ---
 
@@ -224,7 +236,11 @@ DB_HOST=localhost
 DB_PORT=5432
 
 REDIS_URL=redis://localhost:6379/0
+
+OPENAI_API_KEY=sk-...
 ```
+
+**Nota:** `OPENAI_API_KEY` e obrigatorio para o chatbot (GPT-4o-mini + embeddings). Sem ela, os endpoints `/api/v1/chat/` retornam erro 500.
 
 ### 4. Crie o ambiente virtual Python e instale as dependencias
 
@@ -404,13 +420,26 @@ Base URL: `http://localhost:8000/api/v1/`
 
 | Recurso | Endpoint | Metodos |
 |---------|----------|---------|
+| Login | `/authentication/token/` | POST |
+| Refresh token | `/authentication/token/refresh/` | POST |
+| Logout | `/authentication/logout/` | POST |
+| Perfil | `/authentication/me/` | GET, PATCH |
 | Usuarios | `/usuario/` | GET, POST, PUT, PATCH, DELETE |
+| Commodities selecionadas | `/usuario/commodities/` | GET, PUT |
 | Commodities | `/commodities/` | GET, POST, PUT, PATCH, DELETE |
 | Tipos de Derivativo | `/tipos_derivativo/` | GET, POST, PUT, PATCH, DELETE |
 | Meses de Contrato Futuro | `/meses_contrato_futuro/` | GET, POST, PUT, PATCH, DELETE |
 | Cache de Dados de Mercado | `/cache_dados_mercado/` | GET, POST, PUT, PATCH, DELETE |
-| Solicitacoes de Analise | `/solicitacao_analise/` | GET, POST, PUT, PATCH, DELETE |
-| Resultados de Analise | `/resultado_analise/` | GET, POST, PUT, PATCH, DELETE |
+| Lista de analises | `/dados/analises/` | GET |
+| Criar analise | `/dados/analises/create/` | POST |
+| Contagem por status | `/dados/analises/status-count/` | GET |
+| Detalhe de analise | `/dados/analises/{id}/` | GET |
+| Aprovar analise | `/dados/analises/{id}/aprovar/` | PATCH |
+| Reprovar analise | `/dados/analises/{id}/reprovar/` | PATCH |
+| Escolher cenario | `/cenarios/{id}/escolher/` | PATCH |
+| Criar conversa | `/chat/conversations/` | POST |
+| Detalhe de conversa | `/chat/conversations/{uuid}/` | GET |
+| Stream de mensagem (SSE) | `/chat/stream/` | POST |
 
 ---
 
@@ -423,3 +452,23 @@ Base URL: `http://localhost:8000/api/v1/`
 | Landing Page | Vercel | `main` |
 
 O branch `hml` e utilizado como ambiente de homologacao (staging).
+
+### Nota sobre ASGI (chatbot SSE)
+
+O endpoint de streaming do chatbot (`POST /api/v1/chat/stream/`) requer um servidor ASGI. Em producao no Render, alterar o start command para:
+
+```
+uvicorn core.asgi:application --host 0.0.0.0 --port $PORT
+```
+
+Para desenvolvimento local, `python manage.py runserver` suporta ASGI desde Django 4.1 — nenhuma alteracao necessaria.
+
+### Extensao pgvector (chatbot RAG)
+
+Em ambiente local com PostgreSQL 16, instalar a extensao antes de executar as migrations:
+
+```bash
+sudo apt-get install -y postgresql-16-pgvector
+```
+
+Em producao no Render (PostgreSQL 15+), a extensao ja esta disponivel e sera ativada automaticamente pela migration `chatbot/0002_analise_embedding.py`.

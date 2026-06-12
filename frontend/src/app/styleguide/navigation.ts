@@ -29,6 +29,8 @@ export const navigation: NavSection[] = [
       { name: "LineChart", href: "/styleguide/components/line-chart" },
       { name: "PieChart", href: "/styleguide/components/pie-chart" },
       { name: "WorldMap", href: "/styleguide/components/world-map" },
+      { name: "CardSelecaoCenario", href: "/styleguide/components/card-selecao-cenario" },
+      { name: "ScatterChart", href: "/styleguide/components/scatter-chart" },
     ],
   },
   {

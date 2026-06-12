@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 import { API_BASE_URL } from "@/config/apiConfig"
-import { Search, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react"
+import { apiFetch } from "@/services/authService"
+import { Search, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2 } from "lucide-react"
+import { CommodityImageCard } from "@/components/system/commodity/CommodityImageCard"
 
 interface Commodity {
   id: number
@@ -18,6 +20,7 @@ interface Commodity {
   bolsa: string
   moeda: string
   ncm?: string
+  imagem_url?: string | null
 }
 
 interface CommoditiesResponse {
@@ -77,6 +80,7 @@ export default function CommoditiesPage() {
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set())
   const [isFetching, setIsFetching] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
   const [initLoading, setInitLoading] = useState(true)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -104,12 +108,10 @@ export default function CommoditiesPage() {
 
   useEffect(() => {
     if (!isAuthenticated) return
-    fetch(`${API_BASE_URL}/api/v1/usuario/commodities/`, {
-      credentials: "include",
-    })
+    apiFetch(`${API_BASE_URL}/api/v1/usuario/commodities/`)
       .then((r) => r.json())
       .then((data) => {
-        const ids = new Set<number>(data.commodity_ids ?? [])
+        const ids = new Set<number>((data.commodities ?? []).map((c: { id: number }) => c.id))
         setSelectedIds(ids)
         setSavedIds(new Set(ids))
       })
@@ -124,9 +126,7 @@ export default function CommoditiesPage() {
       page_size: String(PAGE_SIZE),
     })
     if (debouncedSearch) params.set("search", debouncedSearch)
-    fetch(`${API_BASE_URL}/api/v1/commodities/?${params}`, {
-      credentials: "include",
-    })
+    apiFetch(`${API_BASE_URL}/api/v1/commodities/?${params}`)
       .then((r) => r.json())
       .then((data: CommoditiesResponse) => {
         setCommodities(data.results ?? [])
@@ -156,14 +156,15 @@ export default function CommoditiesPage() {
   async function handleSave() {
     setIsSaving(true)
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/usuario/commodities/`, {
+      const res = await apiFetch(`${API_BASE_URL}/api/v1/usuario/commodities/`, {
         method: "PUT",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ commodity_ids: [...selectedIds] }),
       })
       if (res.ok) {
-        router.push("/dashboard")
+        setSavedIds(new Set(selectedIds))
+        setSaveSuccess(true)
+        setTimeout(() => router.push("/dashboard"), 1500)
       }
     } finally {
       setIsSaving(false)
@@ -201,8 +202,18 @@ export default function CommoditiesPage() {
           </p>
         </div>
 
+        {/* Alert: sucesso ao salvar */}
+        {saveSuccess && (
+          <Alert className="mb-6 border-success/40 bg-success/10">
+            <CheckCircle2 className="h-4 w-4" style={{ color: "var(--success-foreground)" }} />
+            <AlertDescription className="text-sm" style={{ color: "var(--success-foreground)" }}>
+              Selecao salva com sucesso. Redirecionando para o dashboard...
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Alert: nenhuma selecionada */}
-        {selectedIds.size === 0 && (
+        {!saveSuccess && selectedIds.size === 0 && (
           <Alert className="mb-6 border-warning/40 bg-warning/10">
             <AlertCircle className="h-4 w-4" style={{ color: "var(--warning-foreground)" }} />
             <AlertDescription className="text-sm" style={{ color: "var(--warning-foreground)" }}>
@@ -265,14 +276,24 @@ export default function CommoditiesPage() {
                   onClick={() => toggleCommodity(commodity.id)}
                 >
                   <CardHeader className="pb-2 flex flex-row items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <CardTitle className="text-sm font-semibold text-foreground truncate">
-                        {commodity.nome}
-                      </CardTitle>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {commodity.bolsa}
-                        {commodity.moeda ? ` · ${commodity.moeda}` : ""}
-                      </p>
+                    <div className="flex items-start gap-3 min-w-0">
+                      {commodity.imagem_url && (
+                        <CommodityImageCard
+                          src={commodity.imagem_url}
+                          alt={commodity.nome}
+                          size="sm"
+                          className="shrink-0"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <CardTitle className="text-sm font-semibold text-foreground truncate">
+                          {commodity.nome}
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {commodity.bolsa}
+                          {commodity.moeda ? ` · ${commodity.moeda}` : ""}
+                        </p>
+                      </div>
                     </div>
                     <ToggleSwitch
                       checked={isSelected}
