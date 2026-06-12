@@ -11,6 +11,10 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
+_render_host = config('RENDER_EXTERNAL_HOSTNAME', default=None)
+if _render_host:
+    ALLOWED_HOSTS.append(_render_host)
+
 # Application definition
 
 INSTALLED_APPS = [
