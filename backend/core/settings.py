@@ -158,12 +158,13 @@ JWT_REFRESH_COOKIE_NAME = "refresh_token"
 JWT_REFRESH_COOKIE_PATH = "/api/v1/authentication/"
 JWT_REFRESH_COOKIE_HTTPONLY = True
 JWT_REFRESH_COOKIE_SECURE = not DEBUG  # True em producao
-JWT_REFRESH_COOKIE_SAMESITE = "Lax"
+JWT_REFRESH_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
 JWT_REFRESH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 dias em segundos
 JWT_REFRESH_COOKIE_PARTITIONED = False
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
+_cors_extra = config('CORS_ALLOWED_ORIGINS_EXTRA', default='')
+CORS_ALLOWED_ORIGINS = ["http://localhost:3000"] + [
+    o.strip() for o in _cors_extra.split(',') if o.strip()
 ]
 CORS_ALLOW_CREDENTIALS = True
 
