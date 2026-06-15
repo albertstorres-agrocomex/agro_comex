@@ -127,7 +127,11 @@ class ChatStreamView(generics.GenericAPIView):
 
         # OWASP A01: valida que a conversa pertence ao usuario autenticado
         try:
-            conversation = Conversation.objects.get(id=conversation_id)
+            conversation = Conversation.objects.select_related(
+                "analise__commodity",
+                "analise__tipo_derivativo",
+                "analise__mes_contrato",
+            ).get(id=conversation_id)
         except Exception:
             return HttpResponse(status=404)
 
@@ -143,7 +147,12 @@ class ChatStreamView(generics.GenericAPIView):
             else:
                 history.append(AIMessage(content=msg.content))
 
-        agent_executor = create_agent_executor(request.user)
+        analise_context = (
+            _build_analise_context(conversation.analise)
+            if conversation.analise_id
+            else None
+        )
+        agent_executor = create_agent_executor(request.user, analise_context)
 
         async def event_stream():
             full_response = ""

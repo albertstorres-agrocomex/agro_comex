@@ -215,3 +215,60 @@ class ConversationCreateGreetingTest(TestCase):
         self.client.force_authenticate(user=None)
         res = self.client.post(self.url, {}, format="json")
         self.assertEqual(res.status_code, 401)
+
+
+class ChatStreamAnaliseContextTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username="stream2@test.com", password="pass")
+        self.url = "/api/v1/chat/stream/"
+        perfil = Usuario.objects.get_or_create(user=self.user)[0]
+        commodity = Comomodity.objects.create(
+            nome="SojaStream", codigo="ZSSTREAM", bolsa="CME", unidade="bushel", moeda="USD"
+        )
+        tipo = TipoDerivativo.objects.create(
+            nome="CallStream", rotulo="CALLSTREAM", requer_posicao=False, requer_barreira=False
+        )
+        analise = SolicitacaoAnalise.objects.create(
+            usuario=perfil, commodity=commodity, tipo_derivativo=tipo,
+            preco_mercado_atual=4500, preco_exercicio=4600, status="concluido",
+        )
+        self.conv_com_analise = Conversation.objects.create(user=self.user, analise=analise)
+        self.conv_sem_analise = Conversation.objects.create(user=self.user)
+
+    @patch("chatbot.views.create_agent_executor")
+    def test_stream_com_analise_passa_contexto_nao_nulo(self, mock_create):
+        async def fake_astream(*args, **kwargs):
+            return
+            yield
+        mock_executor = MagicMock()
+        mock_executor.astream_events = fake_astream
+        mock_create.return_value = mock_executor
+        self.client.force_authenticate(self.user)
+        self.client.post(
+            self.url,
+            {"conversation_id": str(self.conv_com_analise.id), "message": "oi"},
+            format="json",
+        )
+        mock_create.assert_called_once()
+        _, analise_context = mock_create.call_args[0]
+        self.assertIsNotNone(analise_context)
+        self.assertEqual(analise_context["commodity"], "SojaStream")
+
+    @patch("chatbot.views.create_agent_executor")
+    def test_stream_sem_analise_passa_contexto_none(self, mock_create):
+        async def fake_astream(*args, **kwargs):
+            return
+            yield
+        mock_executor = MagicMock()
+        mock_executor.astream_events = fake_astream
+        mock_create.return_value = mock_executor
+        self.client.force_authenticate(self.user)
+        self.client.post(
+            self.url,
+            {"conversation_id": str(self.conv_sem_analise.id), "message": "oi"},
+            format="json",
+        )
+        mock_create.assert_called_once()
+        _, analise_context = mock_create.call_args[0]
+        self.assertIsNone(analise_context)
