@@ -605,6 +605,7 @@ backend/chatbot/
 **`Conversation`**
 - `id`: UUIDField (PK, default=uuid4)
 - `user`: ForeignKey para `settings.AUTH_USER_MODEL` (CASCADE)
+- `analise`: ForeignKey para `analises.SolicitacaoAnalise` (SET_NULL, null=True, blank=True, related_name="conversations") — vincula a conversa a uma analise especifica; SET_NULL preserva o historico de chat ao deletar a analise (migration `0003_conversation_analise`)
 - `created_at`: DateTimeField (auto_now_add)
 - `db_table = "chatbot_conversations"`, ordering por `-created_at`
 
@@ -628,28 +629,38 @@ backend/chatbot/
 
 | Metodo | URL | Auth | Descricao |
 |--------|-----|------|-----------|
-| POST | `/api/v1/chat/conversations/` | Bearer | Cria nova conversa vinculada ao usuario autenticado |
+| POST | `/api/v1/chat/conversations/` | Bearer | Cria nova conversa. Body opcional `{ analise_id?, client_hour? }`; resposta `{ id, created_at, greeting: string \| null }`. Com `analise_id` + `client_hour` gera saudacao contextual via LLM |
 | GET | `/api/v1/chat/conversations/<uuid>/` | Bearer | Retorna conversa (404 se nao pertencer ao usuario) |
 | POST | `/api/v1/chat/stream/` | Bearer | Endpoint SSE — recebe `{conversation_id, message}`, faz streaming da resposta do agent |
 
 ### Views
 
-**`ConversationCreateView`** (`generics.CreateAPIView`): cria conversa vinculada ao `request.user`. Aceita GET para retornar conversa existente por PK.
+**`ConversationCreateView`** (`generics.GenericAPIView`, sincrona): cria conversa vinculada ao `request.user`. Metodo `get` preservado para retornar conversa existente por PK (404 se nao pertencer ao usuario). Metodo `post`:
+- Valida `client_hour` (inteiro 0-23) ANTES de criar a conversa — 400 se invalido (evita conversa orfa)
+- Com `analise_id`: ownership check via `SolicitacaoAnalise.objects.get(id=..., usuario__user=request.user)` — 404 se nao encontrada/nao pertence (OWASP A01, deny-by-default, sem vazar existencia). Vincula `Conversation.analise`
+- Com `analise_context` + `client_hour`: gera saudacao one-shot via `create_agent_executor(request.user, analise_context).invoke(...)` (sincrono, sem streaming), persiste como `ConversationMessage(role="ai")` e retorna em `greeting`
+- Sem `analise_id` ou sem `client_hour`: `greeting` e `null`
 
-**`ChatStreamView`** (`generics.GenericAPIView`, async):
+**Helpers (`views.py`)**:
+- `_get_saudacao(hour: int) -> str`: 5-11 -> "Bom-dia", 12-17 -> "Boa tarde", caso contrario "Boa noite"
+- `_build_analise_context(analise) -> dict`: monta `{analise_id, commodity, tipo_derivativo, status, preco_exercicio_reais (= preco_exercicio/100), quantidade_sacas (or 0), data_vencimento (mes_contrato.data_vencimento d/m/Y ou "nao informado")}`
+
+**`ChatStreamView`** (`generics.GenericAPIView`, `post` sincrono com gerador SSE async interno):
 - Valida body: `conversation_id` (UUID) e `message` (nao vazio) — 400 se invalido
 - Verifica `conversation.user_id == request.user.id` — 403 se divergir (OWASP A01)
+- Carrega `Conversation.analise` via `select_related("analise__commodity", "analise__tipo_derivativo", "analise__mes_contrato")` e constroi `analise_context` quando ha analise
 - Carrega historico como `HumanMessage`/`AIMessage`
-- Chama `create_agent_executor(request.user).astream_events(version="v2")`
+- Chama `create_agent_executor(request.user, analise_context).astream_events(version="v2")`
 - Filtra eventos `on_chat_model_stream` e faz yield de `data: {"content": chunk}\n\n`
 - No `finally`: persiste mensagens human e ai via `acreate()`
 - Retorna `StreamingHttpResponse` com `content_type="text/event-stream"` e headers `X-Accel-Buffering: no`, `Cache-Control: no-cache`
 
 ### Agent (`agent.py`)
 
-`create_agent_executor(django_user) -> AgentExecutor`:
+`create_agent_executor(django_user, analise_context: dict | None = None) -> AgentExecutor`:
 - LLM: `ChatOpenAI(model="gpt-4o-mini", streaming=True)`
 - Tools: `[make_db_tool(django_user), make_rag_tool(django_user)]`
+- System prompt montado por `_build_system_prompt(analise_context)`: quando `analise_context` e fornecido, anexa o bloco `ANALISE_CONTEXT_TEMPLATE` (`<contexto_analise>`) ao `SYSTEM_PROMPT`, com os dados da analise (id, commodity, tipo, status, preco de exercicio, quantidade, vencimento) e a instrucao de que o Mauro nunca deve perguntar qual analise discutir
 - `create_tool_calling_agent` + `AgentExecutor(verbose=False)`
 
 #### Identidade do agente — Mauro

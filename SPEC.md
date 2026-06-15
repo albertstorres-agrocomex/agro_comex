@@ -79,7 +79,7 @@ agro_comex/
 | `analises` | Solicitacoes, resultados, cenarios e curva de resultado de analise de risco |
 | `usuario` | Extensao do Usuario Django |
 | `authentication` | Autenticacao JWT (login, refresh, logout, perfil) |
-| `chatbot` | Assistente IA: LangChain Agent + SSE + RAG (pgvector) |
+| `chatbot` | Mauro (assistente IA): LangChain Agent + SSE + RAG (pgvector) |
 | `core` | Configuracoes globais e URLs raiz do projeto |
 
 ### Modelos de Dados
@@ -217,7 +217,7 @@ Todos os recursos seguem o padrao ModelViewSet (CRUD completo):
 | Refresh Token | `authentication/token/refresh/` | POST |
 | Logout | `authentication/logout/` | POST |
 | Perfil | `authentication/me/` | GET, PATCH |
-| Criar conversa | `chat/conversations/` | POST |
+| Criar conversa | `chat/conversations/` | POST — body `{ analise_id?: number, client_hour?: number }`; resposta `{ id, created_at, greeting: string \| null }` |
 | Detalhe de conversa | `chat/conversations/{uuid}/` | GET |
 | Stream de mensagem (SSE) | `chat/stream/` | POST |
 
@@ -315,6 +315,7 @@ O pior resultado prevalece (`INVALIDO > SUSPEITO > OK`). Multiplos motivos sao c
 |---|---|---|
 | id | UUIDField | PK, default=uuid4 |
 | user | ForeignKey (AUTH_USER_MODEL) | CASCADE |
+| analise | ForeignKey (SolicitacaoAnalise) | SET_NULL, null=True, blank=True, related_name="conversations" |
 | created_at | DateTimeField | auto_now_add |
 
 #### `chatbot.ConversationMessage`
@@ -339,16 +340,20 @@ Indice HNSW coseno criado via `RunSQL` na migration `0002_analise_embedding`.
 ### Fluxo do chatbot (SSE)
 
 ```
-1. Frontend: POST /api/v1/chat/conversations/ -> UUID da conversa
+1. Frontend: POST /api/v1/chat/conversations/ {analise_id?, client_hour?} -> {id, created_at, greeting}
+   - Com analise_id (ownership check; 404 se nao pertence ao usuario) a conversa e vinculada via Conversation.analise.
+   - Com analise_id + client_hour, o backend gera a saudacao via LLM (Bom-dia/Boa tarde/Boa noite + primeiro nome + contexto da analise) e persiste como ConversationMessage(role="ai"); retorna em greeting.
+   - Sem analise_id ou sem client_hour, greeting e null.
 2. Usuario digita mensagem -> POST /api/v1/chat/stream/ {conversation_id, message}
 3. ChatStreamView:
    a. Valida auth (401) e propriedade da conversa (403/404)
    b. Carrega historico como HumanMessage/AIMessage
-   c. create_agent_executor(request.user)
-   d. astream_events(version="v2") -> filtra on_chat_model_stream
-   e. yield "data: {content}\n\n" a cada chunk
-   f. finally: acreate() human + ai messages
-   g. yield "data: [DONE]\n\n"
+   c. Carrega Conversation.analise via select_related; cria analise_context quando ha analise
+   d. create_agent_executor(request.user, analise_context)
+   e. astream_events(version="v2") -> filtra on_chat_model_stream
+   f. yield "data: {content}\n\n" a cada chunk
+   g. finally: acreate() human + ai messages
+   h. yield "data: [DONE]\n\n"
 4. Frontend: onChunk() atualiza ultima mensagem AI; onDone() desativa streaming
 ```
 
@@ -383,7 +388,7 @@ Ver `FRONTEND_TECHNICAL_DOC.md` para documentacao completa de componentes, token
 
 | Rota | Descricao |
 |---|---|
-| `/chat` | Assistente IA — aceita `?analise_id={id}` como contexto |
+| `/chat` | Mauro (assistente IA) — aceita `?analise_id={id}` como contexto; saudacao contextual no mount |
 | `/analises/[id]` | Detalhe com botao "Discutir no chat" que navega para `/chat?analise_id={id}` |
 
 ### Design System

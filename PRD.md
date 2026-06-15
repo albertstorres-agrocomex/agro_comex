@@ -85,6 +85,11 @@ Plataforma de inteligencia para o agronegocio com foco em comercio exterior, int
 - [x] Formulario `NovaAnaliseModal` com campos preco_exercicio e quantidade
 - [x] Visualizacao de cenario proposto na pagina `/analises/[id]` com posicionamento e cor dinamicos na curva de resultado
 - [x] Navbar na landing page com botao "Ver Projeto" linkando para o frontend da aplicacao
+- [x] Chatbot Mauro (`/chat`): assistente IA contextual sobre analises de derivativos
+  - Saudacao contextual no inicio da conversa: Bom-dia/Boa tarde/Boa noite conforme o horario do cliente + primeiro nome do usuario logado
+  - Contexto automatico de analise via `?analise_id={id}`: a conversa e vinculada a analise e o Mauro nunca pergunta qual analise discutir
+  - Indicador "Mauro esta digitando" enquanto a saudacao e gerada; greeting exibido antes de qualquer interacao (tela nunca em branco)
+  - Assistente nomeado "Mauro" em toda a UI (avatar, menu, titulo da pagina)
 
 ### Infraestrutura
 

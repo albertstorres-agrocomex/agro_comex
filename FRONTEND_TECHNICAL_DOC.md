@@ -69,7 +69,7 @@ frontend/src/
       [id]/
         page.tsx             # Detalhe de analise — exibe campos, resultado Black-Scholes, cenarios (conservador/moderado/agressivo/proposto) com curva de payoff; cenario proposto destacado com posicionamento e cor dinamicos; acoes aprovar/reprovar (so para concluido); botao "Discutir no chat" navega para /chat?analise_id={id}
     chat/
-      page.tsx               # Assistente IA — ChatPage (Suspense wrapper) + ChatPageInner (le analise_id via useSearchParams); exibe contexto da analise quando presente; requer autenticacao
+      page.tsx               # Mauro — ChatPage (Suspense wrapper) + ChatPageInner (le analise_id via useSearchParams); exibe contexto da analise quando presente; requer autenticacao
     login/
       page.tsx               # Redirect para `/`
     styleguide/
@@ -140,7 +140,7 @@ frontend/src/
 | `/dashboard/commodities` | Selecao de commodities de interesse do usuario |
 | `/analises` | Lista paginada de analises — requer autenticacao |
 | `/analises/[id]` | Detalhe de analise — acoes de aprovacao/reprovacao; botao "Discutir no chat" |
-| `/chat` | Assistente IA — aceita `?analise_id={id}` como contexto opcional |
+| `/chat` | Mauro (assistente IA) — aceita `?analise_id={id}` como contexto opcional; saudacao contextual no mount |
 | `/styleguide` | Design tokens — cores, tipografia, radii |
 | `/styleguide/components/bar-chart` | Showcase do BarChartComex |
 | `/styleguide/components/line-chart` | Showcase do LineChartComex |
@@ -545,7 +545,7 @@ Modal acionado pelo botao "Nova Analise" na pagina `/analises`. Formulario com: 
 
 ---
 
-## Modulo de Chat (Assistente IA)
+## Modulo de Chat (Mauro)
 
 ### chatService.ts
 
@@ -553,9 +553,12 @@ Modal acionado pelo botao "Nova Analise" na pagina `/analises`. Formulario com: 
 
 Servico HTTP do chatbot. Usa `apiFetch` com Bearer token automatico.
 
-**`createConversation(analiseId?: number): Promise<{ id: string, created_at: string }>`**
+**`interface ConversationResponse { id: string; created_at: string; greeting: string | null }`**
+
+**`createConversation(analiseId?: number, clientHour?: number): Promise<ConversationResponse>`**
 - `POST /api/v1/chat/conversations/`
-- Body: `{ analise_id }` se fornecido, caso contrario `{}`
+- Body montado condicionalmente: inclui `analise_id` apenas se `analiseId !== undefined` e `client_hour` apenas se `clientHour !== undefined`
+- Retorna `greeting` (saudacao contextual gerada pelo backend) ou `null`
 
 **`streamMessage(conversationId, message, onChunk, onDone): Promise<void>`**
 - `POST /api/v1/chat/stream/` com `{ conversation_id, message }`
@@ -572,9 +575,19 @@ Servico HTTP do chatbot. Usa `apiFetch` com Bearer token automatico.
 Props: `role: "human" | "ai"`, `content: string`, `isStreaming?: boolean`
 
 - Human: alinhado direita, badge "EU", `bg-[var(--primary)]`, texto `var(--primary-foreground)`
-- AI: alinhado esquerda, badge "IA", `bg-[var(--secondary)]`
+- AI (Mauro): alinhado esquerda, badge "M", `bg-[var(--secondary)]`
 - Cursor pulsante (`animate-pulse`) quando `isStreaming=true`
 - Todos os tokens de cor via CSS custom properties
+
+Nota: o valor de dado `role="ai"` permanece inalterado (enum do model/DB); apenas o texto voltado ao usuario passou a nomear o assistente como "Mauro".
+
+---
+
+### TypingIndicator
+
+**Arquivo:** `src/components/system/chat/TypingIndicator.tsx`
+
+Indicador "Mauro esta digitando" exibido enquanto a saudacao contextual e gerada no backend. Segue o padrao visual do `ChatMessage`: avatar "M" (`bg-[var(--primary)]`), bolha `bg-[var(--secondary)]` e tres pontos animados (`animate-bounce` com delays escalonados). `role="status"` + `aria-label` para acessibilidade. Apenas tokens do styleguide; dark mode via tokens.
 
 ---
 
@@ -584,11 +597,13 @@ Props: `role: "human" | "ai"`, `content: string`, `isStreaming?: boolean`
 
 Props: `analiseId?: number`
 
-Estados: `conversationId`, `messages`, `input`, `isStreaming`, `error`
+Estados: `conversationId`, `messages`, `input`, `isStreaming`, `error`, `isGreeting`
 
 Refs: `bottomRef` (auto-scroll) e `streamActiveRef` (guard de race condition)
 
-- `useEffect` de mount: `createConversation(analiseId)` com flag `cancelled` para evitar setState apos desmonte
+- `useEffect` de mount: `createConversation(analiseId, new Date().getHours())` com flag `cancelled` para evitar setState apos desmonte
+- Quando a resposta traz `greeting`, insere como primeira mensagem `{ role: "ai" }` no estado `messages` (saudacao exibida antes de qualquer interacao — tela nunca em branco)
+- `isGreeting` (ativado so quando ha `analiseId`) exibe `<TypingIndicator />` enquanto a saudacao e gerada e suprime o estado vazio; desligado no `finally`
 - `handleSend`: adiciona mensagem human, inicia stream SSE, acumula chunks na ultima mensagem AI preservando `id` estavel
 - Enter envia; Shift+Enter nao envia
 - `aria-label` em Input e Button para acessibilidade
@@ -608,10 +623,10 @@ Refs: `bottomRef` (auto-scroll) e `streamActiveRef` (guard de race condition)
 
 ---
 
-### Sidebar — item "Assistente IA"
+### Sidebar — item "Mauro"
 
 Adicionado ao array `DEFAULT_NAV_ITEMS` em `Sidebar.tsx`:
-- Label: `"Assistente IA"`, href: `"/chat"`, icon: `Bot` (lucide-react)
+- Label: `"Mauro"`, href: `"/chat"`, icon: `Bot` (lucide-react)
 
 ---
 
