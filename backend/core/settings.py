@@ -167,7 +167,7 @@ CORS_ALLOWED_ORIGINS = ["http://localhost:3000"] + [
     o.strip() for o in _cors_extra.split(',') if o.strip()
 ]
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://agro-comex[a-z0-9\-]*\.vercel\.app$",
+    r"^https://agro-comex-[a-z0-9]+-torres-projects-[a-z0-9]+\.vercel\.app$",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
