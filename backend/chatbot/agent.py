@@ -82,7 +82,32 @@ claramente ao usuario que nao foram encontradas analises para aquele filtro.
 """
 
 
-def create_agent_executor(django_user) -> AgentExecutor:
+ANALISE_CONTEXT_TEMPLATE = """
+
+<contexto_analise>
+Esta conversa esta vinculada a uma analise especifica do usuario.
+Sempre que o usuario mencionar "a analise", "minha analise", "essa analise" ou
+expressoes equivalentes, refira-se exclusivamente a esta analise.
+Nunca pergunte ao usuario qual analise ele deseja discutir — voce ja sabe qual e.
+
+ID: {analise_id}
+Commodity: {commodity}
+Tipo de derivativo: {tipo_derivativo}
+Status: {status}
+Preco de exercicio: R$ {preco_exercicio_reais:.2f}
+Quantidade: {quantidade_sacas} sacas
+Vencimento: {data_vencimento}
+</contexto_analise>
+"""
+
+
+def _build_system_prompt(analise_context: dict | None = None) -> str:
+    if analise_context is None:
+        return SYSTEM_PROMPT
+    return SYSTEM_PROMPT + ANALISE_CONTEXT_TEMPLATE.format(**analise_context)
+
+
+def create_agent_executor(django_user, analise_context: dict | None = None) -> AgentExecutor:
     llm = ChatOpenAI(
         model="gpt-4o-mini",
         api_key=settings.OPENAI_API_KEY,
@@ -90,8 +115,9 @@ def create_agent_executor(django_user) -> AgentExecutor:
     )
     tools = [make_db_tool(django_user), make_rag_tool(django_user)]
 
+    system = _build_system_prompt(analise_context)
     prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT),
+        ("system", system),
         MessagesPlaceholder(variable_name="chat_history"),
         ("human", "{input}"),
         MessagesPlaceholder(variable_name="agent_scratchpad"),
