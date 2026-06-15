@@ -3,14 +3,20 @@ import { apiFetch } from './authService'
 export interface ConversationResponse {
   id: string
   created_at: string
+  greeting: string | null
 }
 
-export async function createConversation(analiseId?: number): Promise<ConversationResponse> {
-  const body = analiseId ? JSON.stringify({ analise_id: analiseId }) : '{}'
+export async function createConversation(
+  analiseId?: number,
+  clientHour?: number,
+): Promise<ConversationResponse> {
+  const payload: Record<string, unknown> = {}
+  if (analiseId !== undefined) payload.analise_id = analiseId
+  if (clientHour !== undefined) payload.client_hour = clientHour
   const res = await apiFetch('/api/v1/chat/conversations/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body,
+    body: JSON.stringify(payload),
   })
   if (!res.ok) throw { status: res.status }
   return res.json()
