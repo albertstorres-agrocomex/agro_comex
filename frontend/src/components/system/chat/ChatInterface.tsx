@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Send } from "lucide-react"
 import { ChatMessage } from "./ChatMessage"
+import { TypingIndicator } from "./TypingIndicator"
 import { createConversation, streamMessage } from "@/services/chatService"
 
 interface Message {
@@ -23,14 +24,29 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
   const [input, setInput] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isGreeting, setIsGreeting] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const streamActiveRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
-    createConversation(analiseId)
-      .then((conv) => { if (!cancelled) setConversationId(conv.id) })
-      .catch(() => { if (!cancelled) setError("Nao foi possivel iniciar a conversa.") })
+    if (analiseId !== undefined) setIsGreeting(true)
+    createConversation(analiseId, new Date().getHours())
+      .then((data) => {
+        if (cancelled) return
+        setConversationId(data.id)
+        if (data.greeting) {
+          setMessages([
+            { id: crypto.randomUUID(), role: "ai", content: data.greeting },
+          ])
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError("Nao foi possivel iniciar a conversa.")
+      })
+      .finally(() => {
+        if (!cancelled) setIsGreeting(false)
+      })
     return () => { cancelled = true }
   }, [analiseId])
 
@@ -92,7 +108,7 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
     <div className="flex flex-col h-full">
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="py-4">
-          {messages.length === 0 && (
+          {messages.length === 0 && !isGreeting && (
             <p className="text-center text-sm text-[var(--muted-foreground)] py-12">
               Faca uma pergunta sobre suas analises de derivativos.
             </p>
@@ -105,6 +121,7 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
               isStreaming={isStreaming && idx === messages.length - 1 && msg.role === "ai"}
             />
           ))}
+          {isGreeting && <TypingIndicator />}
           <div ref={bottomRef} />
         </div>
       </div>
