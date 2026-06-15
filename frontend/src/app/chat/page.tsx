@@ -34,7 +34,7 @@ function ChatPageInner() {
         <main className="flex flex-col flex-1 min-h-0 max-w-3xl mx-auto w-full px-4 py-6">
           <div className="mb-4">
             <h1 className="text-xl font-semibold text-[var(--foreground)]">
-              Assistente AgroComex
+              Mauro
             </h1>
             {analiseId && (
               <p className="text-sm text-[var(--muted-foreground)] mt-0.5">

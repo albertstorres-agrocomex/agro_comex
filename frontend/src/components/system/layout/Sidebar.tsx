@@ -59,7 +59,7 @@ const DEFAULT_NAV_ITEMS: NavItem[] = [
   { label: "Transações",   href: "/transactions", icon: ArrowLeftRight },
   { label: "Commodities",  href: "/commodities",  icon: Package },
   { label: "Mensagens",    href: "/messages",     icon: MessageSquare },
-  { label: "Assistente IA", href: "/chat",        icon: Bot },
+  { label: "Mauro", href: "/chat",        icon: Bot },
   { label: "Configurações",href: "/settings",     icon: Settings },
 ]
 

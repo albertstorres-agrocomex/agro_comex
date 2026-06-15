@@ -230,7 +230,7 @@ export default function StyleguidePage() {
           </div>
           <div className="flex items-baseline gap-4">
             <span className="text-xs text-muted-foreground w-12 shrink-0">H5</span>
-            <h5 className="text-lg font-medium">AgroChat — Assistente Contextual com IA Generativa</h5>
+            <h5 className="text-lg font-medium">AgroChat — Mauro, assistente contextual com IA generativa</h5>
           </div>
           <div className="flex items-baseline gap-4">
             <span className="text-xs text-muted-foreground w-12 shrink-0">H6</span>
@@ -891,10 +891,10 @@ export default function StyleguidePage() {
       {/* ── CHATMESSAGE ── */}
       <Section title="ChatMessage">
         <p className="text-xs text-muted-foreground mb-4">
-          Bolha de mensagem para o Assistente IA. Mensagens do assistente aparecem a esquerda com avatar verde; mensagens do usuario aparecem a direita com avatar accent. O cursor pulsante indica streaming em progresso.
+          Bolha de mensagem do Mauro. Mensagens do Mauro aparecem a esquerda com avatar verde; mensagens do usuario aparecem a direita com avatar accent. O cursor pulsante indica streaming em progresso.
         </p>
         <div className="rounded-[var(--radius-xl)] border border-border bg-card overflow-hidden max-w-2xl">
-          <ChatMessage role="ai" content="Ola! Sou o Assistente AgroComex. Posso analisar suas solicitacoes de derivativos, comparar cenarios Black-Scholes e responder perguntas sobre commodities. Como posso ajudar?" />
+          <ChatMessage role="ai" content="Ola! Sou o Mauro. Posso analisar suas solicitacoes de derivativos, comparar cenarios Black-Scholes e responder perguntas sobre commodities. Como posso ajudar?" />
           <ChatMessage role="human" content="Qual cenario foi recomendado na analise de soja de hoje?" />
           <ChatMessage role="ai" content="Na ultima analise de soja (ID 47), o cenario Moderado foi recomendado pelo modelo. Preco de exercicio: R$ 132,50/60kg, premio de 2,4% e ponto de equilibrio em R$ 129,34. Deseja ver os detalhes completos?" />
           <ChatMessage role="human" content="Sim, quero comparar com o cenario conservador." />

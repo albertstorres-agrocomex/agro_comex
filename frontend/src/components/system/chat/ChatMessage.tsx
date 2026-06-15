@@ -15,7 +15,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
     <div className={cn("flex gap-3 px-4 py-3", isHuman ? "justify-end" : "justify-start")}>
       {!isHuman && (
         <div aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-semibold">
-          IA
+          M
         </div>
       )}
       <div
