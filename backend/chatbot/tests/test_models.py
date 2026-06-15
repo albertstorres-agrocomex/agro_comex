@@ -77,3 +77,34 @@ class AnaliseEmbeddingModelTest(TestCase):
         )
         self.analise.delete()
         self.assertFalse(AnaliseEmbedding.objects.exists())
+
+
+class ConversationAnaliseFKTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="fk@test.com", password="pass")
+        self.perfil = Usuario.objects.get_or_create(user=self.user)[0]
+        commodity = Comomodity.objects.create(
+            nome="SojaFK", codigo="ZSFK", bolsa="CME", unidade="bushel", moeda="USD"
+        )
+        tipo = TipoDerivativo.objects.create(
+            nome="CallFK", rotulo="CALLFK", requer_posicao=False, requer_barreira=False
+        )
+        self.analise = SolicitacaoAnalise.objects.create(
+            usuario=self.perfil, commodity=commodity, tipo_derivativo=tipo,
+            preco_mercado_atual=4500, preco_exercicio=4600, status="concluido",
+        )
+
+    def test_conversation_analise_nullable(self):
+        conv = Conversation.objects.create(user=self.user)
+        self.assertIsNone(conv.analise)
+
+    def test_conversation_com_analise_persiste_fk(self):
+        conv = Conversation.objects.create(user=self.user, analise=self.analise)
+        conv.refresh_from_db()
+        self.assertEqual(conv.analise_id, self.analise.id)
+
+    def test_conversation_analise_set_null_ao_deletar_analise(self):
+        conv = Conversation.objects.create(user=self.user, analise=self.analise)
+        self.analise.delete()
+        conv.refresh_from_db()
+        self.assertIsNone(conv.analise_id)

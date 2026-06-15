@@ -11,6 +11,13 @@ class Conversation(models.Model):
         on_delete=models.CASCADE,
         related_name="conversations",
     )
+    analise = models.ForeignKey(
+        "analises.SolicitacaoAnalise",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="conversations",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
