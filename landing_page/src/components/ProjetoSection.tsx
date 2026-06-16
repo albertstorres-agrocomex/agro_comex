@@ -1,48 +1,48 @@
-import { Server, Database, Globe, Layers } from "lucide-react";
+import { Server, Database, Globe, MessageSquare } from "lucide-react"
 
 const stack = [
   {
     icon: Globe,
     nome: "Frontend",
     tech: "Next.js + Tailwind + Recharts",
-    desc: "Interface web responsiva para visualização de posições, curvas de hedge e dashboards analíticos.",
+    desc: "Interface web responsiva para visualizacao de analises, curvas de hedge e dashboards de commodities. Dark mode nativo.",
     deploy: "Vercel",
     cor: "oklch(0.87 0.185 125)",
   },
   {
     icon: Server,
     nome: "Backend",
-    tech: "Python / Django Rest Framework",
-    desc: "API REST para integração com fontes de dados de mercado, motor de cálculo de hedge e gestão de usuários.",
+    tech: "Python / Django REST + Celery",
+    desc: "API REST com motor de calculo de hedge, fila assincrona (Celery + Redis) e gestao de usuarios com autenticacao JWT.",
     deploy: "Render",
     cor: "oklch(0.26 0.068 145)",
   },
   {
     icon: Database,
     nome: "Banco de Dados",
-    tech: "PostgreSQL (Neon)",
-    desc: "Armazenamento de contratos, histórico de operações, usuários e séries históricas de preços.",
+    tech: "PostgreSQL + pgvector (Neon)",
+    desc: "Armazenamento de analises, series historicas e embeddings vetoriais para busca semantica do agente Mauro.",
     deploy: "Neon",
     cor: "oklch(0.64 0.185 280)",
   },
   {
-    icon: Layers,
-    nome: "Landing Page",
-    tech: "Next.js + Tailwind",
-    desc: "Página pública de apresentação do projeto, com deploy independente no Vercel.",
-    deploy: "Vercel",
-    cor: "oklch(0.60 0.12 185)",
+    icon: MessageSquare,
+    nome: "Agente Mauro",
+    tech: "OpenAI gpt-4o-mini + pgvector",
+    desc: "Agente de IA com tool-calling, busca semantica e acesso contextualizado as analises do usuario. Streaming via SSE.",
+    deploy: "Backend",
+    cor: "oklch(0.87 0.185 125)",
   },
-];
+]
 
 const funcionalidades = [
-  "Dashboard de posições e exposições cambiais",
-  "Cálculo automatizado de estratégias de hedge (NDF, opções, swaps)",
-  "Alertas de limites e gatilhos de proteção",
-  "Integração com cotações de câmbio e commodities em tempo real",
-  "Histórico e rastreabilidade de decisões",
-  "Relatórios para compliance e gestão de risco",
-];
+  "Analise de hedge com Black-Scholes — curva de resultado e 4 cenarios (conservador, moderado, agressivo, proposto)",
+  "Agente Mauro: perguntas em linguagem natural sobre posicoes e analises",
+  "Dashboard de commodities com graficos de preco em tempo real (Recharts)",
+  "Busca semantica em historico de analises via pgvector (extensao Neon)",
+  "Streaming de respostas do Mauro via SSE — token a token, sem latencia",
+  "Cadastro de usuarios com isolamento completo de dados por conta",
+]
 
 export default function ProjetoSection() {
   return (
@@ -60,11 +60,11 @@ export default function ProjetoSection() {
             </span>
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Arquitetura da Solução
+            Arquitetura da Solucao
           </h2>
           <p className="text-[oklch(0.65_0.010_75)] max-w-xl mx-auto">
-            Uma stack moderna e escalável, com cada componente hospedado de
-            forma independente para máxima flexibilidade e custo otimizado.
+            Uma stack moderna e escalavel, com cada componente hospedado de
+            forma independente para maxima flexibilidade e custo otimizado.
           </p>
         </div>
 
