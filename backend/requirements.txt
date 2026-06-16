@@ -73,3 +73,7 @@ uvicorn==0.34.3
 pgvector==0.4.2
 dj-database-url==2.3.0
 gunicorn==21.2.0
+scikit-learn==1.7.2
+joblib==1.5.1
+arch==7.2.0
+matplotlib==3.10.0
