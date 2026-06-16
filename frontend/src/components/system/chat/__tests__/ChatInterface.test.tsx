@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { ChatInterface } from '../ChatInterface'
 
 vi.mock('@/services/chatService', () => ({
@@ -7,8 +7,9 @@ vi.mock('@/services/chatService', () => ({
   streamMessage: vi.fn(),
 }))
 
-import { createConversation } from '@/services/chatService'
+import { createConversation, streamMessage } from '@/services/chatService'
 const mockCreate = vi.mocked(createConversation)
+const mockStream = vi.mocked(streamMessage)
 
 const baseResponse = { id: 'conv-uuid', created_at: '2026-01-01T00:00:00' }
 
@@ -85,6 +86,30 @@ describe('ChatInterface', () => {
       expect(mockCreate).toHaveBeenCalled()
     })
     expect(screen.queryByText('Mauro esta digitando')).not.toBeInTheDocument()
+  })
+
+  it('mostra "Mauro esta digitando" ao enviar mensagem e some no primeiro chunk', async () => {
+    mockCreate.mockResolvedValue({ ...baseResponse, greeting: null })
+    let emitChunk!: (content: string) => void
+    mockStream.mockImplementation(async (_id, _msg, onChunk) => {
+      emitChunk = onChunk
+      await new Promise(() => {})
+    })
+
+    render(<ChatInterface />)
+    const input = await screen.findByLabelText('Digite sua mensagem')
+    await waitFor(() => expect(input).not.toBeDisabled())
+
+    fireEvent.change(input, { target: { value: 'Qual o delta?' } })
+    fireEvent.click(screen.getByLabelText('Enviar mensagem'))
+
+    expect(await screen.findByText('Mauro esta digitando')).toBeInTheDocument()
+
+    emitChunk('Resposta')
+    await waitFor(() => {
+      expect(screen.queryByText('Mauro esta digitando')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('Resposta')).toBeInTheDocument()
   })
 
   it('nao atualiza estado apos componente ser desmontado', async () => {

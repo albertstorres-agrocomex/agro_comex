@@ -25,6 +25,7 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isGreeting, setIsGreeting] = useState(false)
+  const [isAwaitingReply, setIsAwaitingReply] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const streamActiveRef = useRef(false)
 
@@ -56,7 +57,7 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+  }, [messages, isAwaitingReply])
 
   async function handleSend() {
     if (!input.trim() || !conversationId || isStreaming) return
@@ -66,8 +67,9 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
     setError(null)
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "human", content: userMessage }])
     setIsStreaming(true)
+    setIsAwaitingReply(true)
     streamActiveRef.current = true
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "ai", content: "" }])
+    let replyStarted = false
 
     try {
       await streamMessage(
@@ -75,6 +77,12 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
         userMessage,
         (chunk) => {
           if (!streamActiveRef.current) return
+          if (!replyStarted) {
+            replyStarted = true
+            setIsAwaitingReply(false)
+            setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "ai", content: chunk }])
+            return
+          }
           setMessages((prev) => {
             const updated = [...prev]
             updated[updated.length - 1] = {
@@ -86,13 +94,14 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
         },
         () => {
           streamActiveRef.current = false
+          setIsAwaitingReply(false)
           setIsStreaming(false)
         },
       )
     } catch {
       streamActiveRef.current = false
       setError("Erro ao processar a mensagem. Tente novamente.")
-      setMessages((prev) => prev.slice(0, -1))
+      setIsAwaitingReply(false)
       setIsStreaming(false)
     }
   }
@@ -121,7 +130,7 @@ export function ChatInterface({ analiseId }: ChatInterfaceProps) {
               isStreaming={isStreaming && idx === messages.length - 1 && msg.role === "ai"}
             />
           ))}
-          {isGreeting && <TypingIndicator />}
+          {(isGreeting || isAwaitingReply) && <TypingIndicator />}
           <div ref={bottomRef} />
         </div>
       </div>

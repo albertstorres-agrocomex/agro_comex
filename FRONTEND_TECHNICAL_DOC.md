@@ -587,7 +587,7 @@ Nota: o valor de dado `role="ai"` permanece inalterado (enum do model/DB); apena
 
 **Arquivo:** `src/components/system/chat/TypingIndicator.tsx`
 
-Indicador "Mauro esta digitando" exibido enquanto a saudacao contextual e gerada no backend. Segue o padrao visual do `ChatMessage`: avatar "M" (`bg-[var(--primary)]`), bolha `bg-[var(--secondary)]` e tres pontos animados (`animate-bounce` com delays escalonados). `role="status"` + `aria-label` para acessibilidade. Apenas tokens do styleguide; dark mode via tokens.
+Indicador "Mauro esta digitando" exibido enquanto a saudacao contextual e gerada no backend e tambem enquanto o Mauro prepara cada resposta (entre o envio da mensagem do usuario e o primeiro chunk do stream). Segue o padrao visual do `ChatMessage`: avatar "M" (`bg-[var(--primary)]`), bolha `bg-[var(--secondary)]` e tres pontos animados (`animate-bounce` com delays escalonados). `role="status"` + `aria-label` para acessibilidade. Apenas tokens do styleguide; dark mode via tokens.
 
 ---
 
@@ -597,14 +597,15 @@ Indicador "Mauro esta digitando" exibido enquanto a saudacao contextual e gerada
 
 Props: `analiseId?: number`
 
-Estados: `conversationId`, `messages`, `input`, `isStreaming`, `error`, `isGreeting`
+Estados: `conversationId`, `messages`, `input`, `isStreaming`, `error`, `isGreeting`, `isAwaitingReply`
 
 Refs: `bottomRef` (auto-scroll) e `streamActiveRef` (guard de race condition)
 
 - `useEffect` de mount: `createConversation(analiseId, new Date().getHours())` com flag `cancelled` para evitar setState apos desmonte
 - Quando a resposta traz `greeting`, insere como primeira mensagem `{ role: "ai" }` no estado `messages` (saudacao exibida antes de qualquer interacao — tela nunca em branco)
 - `isGreeting` (ativado so quando ha `analiseId`) exibe `<TypingIndicator />` enquanto a saudacao e gerada e suprime o estado vazio; desligado no `finally`
-- `handleSend`: adiciona mensagem human, inicia stream SSE, acumula chunks na ultima mensagem AI preservando `id` estavel
+- `handleSend`: adiciona mensagem human, ativa `isAwaitingReply` (exibe `<TypingIndicator />`), inicia stream SSE; a bolha AI so e criada no primeiro chunk (desligando `isAwaitingReply`), e os chunks seguintes sao acumulados na ultima mensagem AI preservando `id` estavel
+- `isAwaitingReply` exibe `<TypingIndicator />` em toda resposta do Mauro; desligado no primeiro chunk, no `onDone` e no `catch`
 - Enter envia; Shift+Enter nao envia
 - `aria-label` em Input e Button para acessibilidade
 - `key={msg.id}` (UUID) em vez de index — key estavel durante streaming
