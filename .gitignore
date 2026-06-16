@@ -8,6 +8,9 @@ sr1/gerar_slides.py
 sr1/apresentacao_sr1.pptx
 docs/superpowers/
 
+# SR2 - pasta completa (nao versionar)
+sr2/
+
 # Dependencies
 node_modules/
 .pnp
@@ -81,3 +84,7 @@ Aula 03 - Critérios para o SR1.pdf
 DEBATE_IMPLEMENTACAO_CHATBOT.md
 IMPLEMENTAÇÃO_CHATBOT.md
 README_MAURO.md
+
+# Material de estudo / artefatos de ML (nao versionar)
+02_end_to_end_machine_learning_project.py
+pipeline_ml.svg
