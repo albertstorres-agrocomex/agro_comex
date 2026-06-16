@@ -191,3 +191,26 @@ def persistir_exportacao_mensal(registros: list[dict[str, Any]]) -> int:
         )
         count += 1
     return count
+
+
+def obter_cotacao_cache(commodity):
+    """Retorna a cotacao mais recente do cache local para a commodity.
+
+    Returns dict {"preco_usd", "data_preco", "fonte"} ou None se nao houver dado.
+    """
+    from dados.models import CacheDadosMercado
+    from analises.price_utils import centavos_para_usd
+
+    registro = (
+        CacheDadosMercado.objects
+        .filter(commodity=commodity, fonte__in=["CEPEA_SPOT", "B3_FUTUROS"])
+        .order_by("-data_preco")
+        .first()
+    )
+    if registro is None:
+        return None
+    return {
+        "preco_usd": centavos_para_usd(registro.preco_fechamento),
+        "data_preco": registro.data_preco,
+        "fonte": registro.fonte,
+    }
