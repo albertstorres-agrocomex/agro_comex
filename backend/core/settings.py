@@ -185,3 +185,7 @@ CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 # OpenAI
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
+
+# Cotacao do Mauro: "AO_VIVO" (agrobr em tempo real, com fallback p/ cache) ou "CACHE"
+COTACAO_MODO = config('COTACAO_MODO', default='AO_VIVO')
+COTACAO_TIMEOUT_SEGUNDOS = config('COTACAO_TIMEOUT_SEGUNDOS', default=5, cast=int)
