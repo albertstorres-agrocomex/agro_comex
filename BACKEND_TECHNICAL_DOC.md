@@ -556,7 +556,7 @@ Os parametros intermediarios `d1` e `d2` sao armazenados diretamente em campos `
 
 ## App `chatbot`
 
-Assistente de IA especializado em derivativos agricolas. Permite que o usuario converse em linguagem natural sobre suas analises. O backend executa um LangChain Agent com GPT-4o-mini e duas ferramentas: busca ORM (Tool 1) e busca semantica via pgvector/RAG (Tool 2). O frontend consome via Server-Sent Events (SSE) com streaming progressivo.
+Assistente de IA especializado em derivativos agricolas. Permite que o usuario converse em linguagem natural sobre suas analises. O backend executa um LangChain Agent com GPT-4o-mini e tres ferramentas: busca ORM (Tool 1), busca semantica via pgvector/RAG (Tool 2) e cotacao atual por commodity (Tool 3). O frontend consome via Server-Sent Events (SSE) com streaming progressivo.
 
 ### Dependencias adicionadas
 
@@ -659,7 +659,7 @@ backend/chatbot/
 
 `create_agent_executor(django_user, analise_context: dict | None = None) -> AgentExecutor`:
 - LLM: `ChatOpenAI(model="gpt-4o-mini", streaming=True)`
-- Tools: `[make_db_tool(django_user), make_rag_tool(django_user)]`
+- Tools: `[make_db_tool(django_user), make_rag_tool(django_user), make_cotacao_tool(django_user)]`
 - System prompt montado por `_build_system_prompt(analise_context)`: quando `analise_context` e fornecido, anexa o bloco `ANALISE_CONTEXT_TEMPLATE` (`<contexto_analise>`) ao `SYSTEM_PROMPT`, com os dados da analise (id, commodity, tipo, status, preco de exercicio, quantidade, vencimento) e a instrucao de que o Mauro nunca deve perguntar qual analise discutir
 - `create_tool_calling_agent` + `AgentExecutor(verbose=False)`
 
@@ -697,6 +697,28 @@ prompt = ChatPromptTemplate.from_messages([...]).partial(
 - Gera embedding da query via OpenAI `text-embedding-3-small`
 - Busca top-5 `AnaliseEmbedding` por `CosineDistance` filtrando `analise__usuario=perfil`
 - Retorna texto com ID, tipo, commodity, status e resumo do content (100 chars)
+
+### Tool 3 — consultar_cotacao_atual (`tool_cotacao.py`)
+
+`make_cotacao_tool(django_user)` retorna `@tool consultar_cotacao_atual(commodity: str) -> str`. Da ao Mauro a cotacao atual de uma commodity associada ao usuario para responder perguntas como "com base na cotacao atual da soja, meu call ainda vale a pena?".
+
+Fluxo interno (tudo determinístico em codigo; o LLM so escolhe o nome da commodity):
+1. Resolve o nome informado contra a allowlist do usuario (`Usuario.commodities.filter(ativo=True)`), casando por nome ou codigo normalizado (sem acento, lowercase).
+2. Se nao resolver na conta mas a commodity existir no catalogo global (`Comomodity.objects.filter(ativo=True)`), recusa e orienta a buscar fonte externa. Se nao existir em lugar nenhum, pede esclarecimento.
+3. Busca o preco conforme `settings.COTACAO_MODO`:
+   - `AO_VIVO` (padrao): `obter_cotacao_ao_vivo` (agrobr/CEPEA spot — apenas soja, milho, cafe) executado num `ThreadPoolExecutor` com `settings.COTACAO_TIMEOUT_SEGUNDOS`; em timeout, excecao ou retorno `None`, faz fallback automatico para o cache.
+   - `CACHE`: `obter_cotacao_cache` — ultimo `CacheDadosMercado` com `fonte__in=["CEPEA_SPOT","B3_FUTUROS"]`, `order_by("-data_preco")`, convertido por `centavos_para_usd`.
+4. Retorna string compacta com apenas campos whitelistados: commodity, fonte, preco em USD, unidade e data de referencia.
+
+Funcoes de servico em `dados/servicos.py`:
+- `obter_cotacao_cache(commodity)` -> `{"preco_usd", "data_preco", "fonte"}` ou `None`.
+- `obter_cotacao_ao_vivo(commodity)` -> idem; `None` para commodities sem fonte spot ao vivo; pode levantar excecao de rede (o chamador trata e cai no cache). `_cepea_centavos_usd` isola a chamada agrobr para ser mockada em teste.
+
+Settings (`core/settings.py`):
+- `COTACAO_MODO` (default `AO_VIVO`): `"AO_VIVO"` ou `"CACHE"`.
+- `COTACAO_TIMEOUT_SEGUNDOS` (default `5`): limite do fetch ao vivo antes do fallback.
+
+Seguranca: posse re-checada server-side via queryset (A01); nenhuma URL e controlada por LLM ou usuario, o agrobr acessa fontes fixas B3/CEPEA (A10 SSRF); retorno somente com campos whitelistados, sem payload bruto nem stack trace (A05).
 
 ### Embedding e idempotencia (`embedding.py` + `tasks.py`)
 
