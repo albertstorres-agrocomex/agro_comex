@@ -31,3 +31,17 @@ def ajustar_rolagem(df: pd.DataFrame, limiar: float = 0.12, datas_rolagem=None) 
 def preparar_serie(df: pd.DataFrame, limiar: float = 0.12, datas_rolagem=None) -> pd.DataFrame:
     ajustado = ajustar_rolagem(df, limiar=limiar, datas_rolagem=datas_rolagem)
     return calcular_retornos_log(ajustado)
+
+
+def merge_macro(df_ajustado: pd.DataFrame, df_macro: pd.DataFrame) -> pd.DataFrame:
+    precos = df_ajustado.sort_values("data").copy()
+    macro = df_macro.sort_values("data").copy()
+    out = pd.merge_asof(
+        precos.sort_values("data"),
+        macro[["data", "usd_brl", "selic"]].sort_values("data"),
+        on="data",
+        direction="backward",
+    )
+    out = out.sort_values(["commodity", "data"]).reset_index(drop=True)
+    out[["usd_brl", "selic"]] = out.groupby("commodity")[["usd_brl", "selic"]].ffill()
+    return out
