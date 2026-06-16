@@ -1,11 +1,12 @@
 # AgroComex
 
-Plataforma de inteligencia de mercado para o agronegocio brasileiro. Consolida dados de commodities, derivativos e comercio exterior para oferecer analises quantitativas e visualizacoes interativas.
+Plataforma de inteligencia de mercado para o agronegocio brasileiro. Consolida dados de commodities, derivativos e comercio exterior para oferecer analises quantitativas, precificacao de risco e visualizacoes interativas, com um assistente de IA (Mauro) para apoio a decisao.
 
 ---
 
 ## Indice
 
+- [Funcionalidades](#funcionalidades)
 - [Stack](#stack)
 - [Estrutura do Repositorio](#estrutura-do-repositorio)
 - [Pre-requisitos](#pre-requisitos)
@@ -19,6 +20,18 @@ Plataforma de inteligencia de mercado para o agronegocio brasileiro. Consolida d
   - [6. Landing Page](#6-landing-page)
 - [Endpoints da API](#endpoints-da-api)
 - [Deploy](#deploy)
+
+---
+
+## Funcionalidades
+
+- **Precificacao de derivativos (Black-Scholes):** calcula o premio de opcoes (call/put) usando volatilidade historica (252 pregoes) e taxa SELIC, persistindo d1, d2 e o valor total do contrato para auditoria.
+- **Motor de cenarios:** gera automaticamente 3 strikes (K-10%, K, K+10%) mais o cenario proposto pelo usuario, recomenda o melhor e calcula a curva de payoff (P&L) de cada cenario.
+- **Pipeline de dados de mercado:** coleta periodica (Celery Beat) de cambio, SELIC e IPCA (BCB) e precos de commodities (B3, CEPEA), com validacao de qualidade em duas etapas (estrutural e outlier) e upsert sem duplicatas.
+- **Comercio exterior:** consolidacao de dados de exportacao e indices, com exportacao para Excel.
+- **Assistente IA "Mauro":** chatbot contextual sobre as analises (LangChain Agent + GPT-4o-mini), com saudacao contextual, busca via ORM e busca semantica (RAG com pgvector) e resposta em streaming (SSE).
+- **Autenticacao JWT:** access token de curta duracao em memoria e refresh token HttpOnly com rotacao e blacklist.
+- **Visualizacoes interativas:** graficos (barras, linha, pizza/donut) e mapa-mundi coropletico, alem de styleguide de design system com tokens OKLCH e dark mode.
 
 ---
 
@@ -39,17 +52,25 @@ Plataforma de inteligencia de mercado para o agronegocio brasileiro. Consolida d
 | OpenAI SDK | 1.82.0 | GPT-4o-mini (chat) e text-embedding-3-small (RAG) |
 | pgvector | 0.4.2 | Busca semantica por similaridade coseno no PostgreSQL |
 | uvicorn | 0.34.3 | Servidor ASGI para endpoints SSE (producao) |
+| python-bcb | 0.3.4 | Coleta de cambio, SELIC e IPCA (BCB SGS) |
+| agrobr | 1.0.4 | Coleta de precos de commodities (B3, CEPEA) |
+| pandas | 3.0.1 | Processamento e normalizacao de dados |
+| DuckDB | 1.5.1 | Consultas analiticas sobre os dados |
+| openpyxl | 3.1.5 | Exportacao de dados para Excel |
 
 ### Frontend
 | Tecnologia | Versao | Funcao |
 |-----------|--------|--------|
-| Next.js | 16.1.6 | React framework (app) |_page, o botão 
+| Next.js | 16.1.6 | React framework (App Router) |
 | React | 19.2.3 | UI library |
 | TypeScript | 5 | Tipagem estatica |
 | Tailwind CSS | 4 | Estilizacao utilitaria |
-| shadcn/ui | 3.8.5 | Componentes base |
+| shadcn/ui | New York | Componentes base (sobre Radix UI) |
 | Recharts | 3.8.0 | Graficos |
 | react-simple-maps | 3.0.0 | Mapa mundial interativo |
+| axios | 1.9.0 | Cliente HTTP para a API |
+| lucide-react | 0.577.0 | Icones |
+| Vitest + Testing Library | 4.1.9 | Testes unitarios e de componentes |
 
 ---
 
@@ -72,8 +93,12 @@ agro_comex/
 │   └── .env.example
 ├── frontend/                   # Aplicacao principal (Next.js)
 │   └── src/
-│       ├── app/                # Paginas e rotas
-│       ├── components/         # Componentes visuais e ui/
+│       ├── app/                # Paginas e rotas (analises, chat, dashboard, login, styleguide)
+│       ├── components/         # Componentes visuais e ui/ (shadcn)
+│       ├── services/           # Integracao com a API (auth, analises, chat, commodities)
+│       ├── contexts/           # Contextos de React (ex: autenticacao)
+│       ├── config/             # Configuracoes (ex: base URL da API)
+│       ├── types/              # Tipos TypeScript compartilhados
 │       └── lib/                # Utilitarios
 └── landing_page/               # Site de marketing (Next.js)
 ```
@@ -385,6 +410,13 @@ npm run dev
 A aplicacao estara disponivel em: `http://localhost:3000`
 
 O styleguide de componentes e tokens de design esta em: `http://localhost:3000/styleguide`
+
+Testes (Vitest + Testing Library):
+
+```bash
+npm test          # modo watch
+npm run test:run  # execucao unica (CI)
+```
 
 ---
 
