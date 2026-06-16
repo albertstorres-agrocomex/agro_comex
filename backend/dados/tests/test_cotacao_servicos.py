@@ -1,8 +1,9 @@
 from datetime import date
+from unittest.mock import patch
 from django.test import TestCase
 from commodities.models import Comomodity
 from dados.models import CacheDadosMercado
-from dados.servicos import obter_cotacao_cache
+from dados.servicos import obter_cotacao_cache, obter_cotacao_ao_vivo
 
 
 class ObterCotacaoCacheTest(TestCase):
@@ -36,3 +37,23 @@ class ObterCotacaoCacheTest(TestCase):
 
     def test_retorna_none_sem_dados(self):
         self.assertIsNone(obter_cotacao_cache(self.commodity))
+
+
+class ObterCotacaoAoVivoTest(TestCase):
+    def setUp(self):
+        self.soja = Comomodity.objects.create(
+            nome="Soja", codigo="ZS", bolsa="B3", unidade="saca", moeda="USD"
+        )
+        self.boi = Comomodity.objects.create(
+            nome="Boi Gordo", codigo="BGI", bolsa="B3", unidade="arroba", moeda="USD"
+        )
+
+    @patch("dados.servicos._cepea_centavos_usd")
+    def test_soja_retorna_preco_ao_vivo(self, mock_cepea):
+        mock_cepea.return_value = (13600, date(2026, 6, 16))
+        res = obter_cotacao_ao_vivo(self.soja)
+        self.assertEqual(res["preco_usd"], 136.0)
+        self.assertEqual(res["fonte"], "CEPEA_SPOT")
+
+    def test_commodity_sem_fonte_ao_vivo_retorna_none(self):
+        self.assertIsNone(obter_cotacao_ao_vivo(self.boi))

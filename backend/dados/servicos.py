@@ -214,3 +214,55 @@ def obter_cotacao_cache(commodity):
         "data_preco": registro.data_preco,
         "fonte": registro.fonte,
     }
+
+
+# Mapa nome-normalizado -> identificador agrobr CEPEA (spot disponivel)
+_AGROBR_CEPEA = {"soja": "soja", "milho": "milho", "cafe": "cafe"}
+
+
+def _normalizar_nome(nome):
+    import unicodedata
+
+    s = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode()
+    return s.strip().lower()
+
+
+def _cepea_centavos_usd(agrobr_id):
+    """Busca o preco spot CEPEA mais recente e retorna (centavos_usd, data).
+
+    Isola a chamada agrobr para ser facilmente mockada nos testes.
+    """
+    import asyncio
+    from agrobr import datasets
+    from dados.limpeza.agrobr import normalizar_precos_cepea
+    from dados.limpeza.conversao import obter_taxa_usd_brl
+
+    df = asyncio.run(datasets.preco_diario(agrobr_id))
+    usd_brl = obter_taxa_usd_brl()
+    registros = normalizar_precos_cepea(
+        df, commodity=agrobr_id, fonte="CEPEA_SPOT", usd_brl=usd_brl
+    )
+    if not registros:
+        raise ValueError("sem registros CEPEA")
+    mais_recente = max(registros, key=lambda r: r["data_preco"])
+    return mais_recente["preco_fechamento"], mais_recente["data_preco"]
+
+
+def obter_cotacao_ao_vivo(commodity):
+    """Busca a cotacao spot ao vivo via agrobr (apenas soja/milho/cafe).
+
+    Returns dict {"preco_usd", "data_preco", "fonte"} ou None se nao houver
+    fonte ao vivo para a commodity. Pode levantar excecao em falha de rede;
+    o chamador deve tratar e cair no cache.
+    """
+    from analises.price_utils import centavos_para_usd
+
+    agrobr_id = _AGROBR_CEPEA.get(_normalizar_nome(commodity.nome))
+    if agrobr_id is None:
+        return None
+    centavos, data_preco = _cepea_centavos_usd(agrobr_id)
+    return {
+        "preco_usd": centavos_para_usd(centavos),
+        "data_preco": data_preco,
+        "fonte": "CEPEA_SPOT",
+    }
