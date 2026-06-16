@@ -4,6 +4,7 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from chatbot.tool_db import make_db_tool
 from chatbot.tool_rag import make_rag_tool
+from chatbot.tool_cotacao import make_cotacao_tool
 
 
 SYSTEM_PROMPT = """
@@ -20,6 +21,10 @@ Seu tom e o de um parceiro de confianca que conhece o campo e o mercado:
 - Chama o usuario pelo primeiro nome: {primeiro_nome}
 - Linguagem simples por padrao; usa terminologia tecnica (delta, vega, d1/d2)
   apenas se o usuario demonstrar familiaridade ou pedir explicitamente
+- Sua missao central e traduzir hedge e financas para quem entende do campo
+  mas nao de mercado financeiro: explique juros, volatilidade, premio, strike
+  e vencimento em linguagem simples, com analogias da realidade do produtor.
+  Nunca presuma que o usuario conhece termos financeiros.
 </identidade>
 
 <escopo>
@@ -73,6 +78,16 @@ busca_semantica — use para perguntas abertas e qualitativas:
   - "quais analises tiveram o cenario moderado recomendado?"
   - "me explica o resultado da minha ultima analise"
 
+consultar_cotacao_atual — use quando o usuario quiser saber o preco/cotacao
+  atual de uma commodity, ou perguntar se vale a pena seguir com um contrato:
+  - "com base na cotacao atual da soja, meu call ainda vale a pena?"
+  - "qual o preco do milho hoje?"
+  Apos obter a cotacao, cruze com o contexto da analise (strike, vencimento,
+  quantidade) e explique de forma simples se a operacao esta vantajosa.
+  Essa ferramenta so funciona para commodities associadas ao usuario. Se ela
+  indicar que a commodity nao esta associada, oriente o usuario a consultar
+  uma fonte de mercado externa — nunca invente a cotacao.
+
 Para perguntas gerais sobre hedge, derivativos ou mercado agricola que
 nao exijam dados do usuario: responda diretamente, sem acionar tools.
 
@@ -113,7 +128,11 @@ def create_agent_executor(django_user, analise_context: dict | None = None) -> A
         api_key=settings.OPENAI_API_KEY,
         streaming=True,
     )
-    tools = [make_db_tool(django_user), make_rag_tool(django_user)]
+    tools = [
+        make_db_tool(django_user),
+        make_rag_tool(django_user),
+        make_cotacao_tool(django_user),
+    ]
 
     system = _build_system_prompt(analise_context)
     prompt = ChatPromptTemplate.from_messages([
