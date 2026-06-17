@@ -760,6 +760,89 @@ Em producao no Render (PostgreSQL 15+), a extensao ja esta disponivel.
 
 ---
 
+## Modulo de ML de Volatilidade — `analises/ml/`
+
+### Objetivo
+
+Prever a **volatilidade realizada futura** (desvio-padrao anualizado dos retornos log em horizonte H=21 pregoes) para substituir a volatilidade historica estatica de 252 dias usada atualmente pelo Black-Scholes em `analises/calculators.py`. Enquadramento: regressao supervisionada de forecasting, modelo pooled commodity-aware (um unico modelo para ZS/ZC/KC com a commodity como feature).
+
+### Status de integracao
+
+**Nesta fase o modulo roda em separado (standalone).** Nao ha integracao com `analises/calculators.py`, nem com o pipeline Celery, nem com o fluxo de precificacao Black-Scholes. A integracao ao produto (scoring sob demanda via Celery, substituicao do sigma no Black-Scholes) esta registrada como fase futura.
+
+### Fluxo de execucao
+
+```
+management command treinar_volatilidade
+        |
+        v
+carga.py — carrega precos (CacheDadosMercado) e macro (DadosMacroeconomicos) via ORM
+        |
+        v
+preparacao.py — ajuste de rolagem front-month B3, retornos log, merge macro
+        |
+        v
+features.py — volatilidades em multiplas janelas (21/63/252d), sinal de leverage,
+              regime preco x MM60, flags sazonalidade safra/entressafra
+        |
+        v
+dataset.py — rotulo y = vol realizada futura (t, t+H], montagem do dataset
+             supervisionado com drop de NaN
+        |
+        v
+validacao.py — split cronologico (80/20) + folds com gap temporal
+        |
+        v
+baselines.py — baseline 252d (status quo) + GARCH(1,1)
+        |
+        v
+modelos.py — modelos candidatos (linear + arvores)
+        |
+        v
+treino.py — treino, avaliacao vs baselines, persistencia do artefato joblib
+        |
+        v
+relatorio.py — tabela markdown comparativa (modelo vs baselines) +
+               grafico previsto-vs-realizado (matplotlib)
+        |
+        v
+runner.py — orquestra o pipeline completo; retorna metricas + caminhos dos artefatos
+```
+
+### Management command
+
+```bash
+cd backend && python manage.py treinar_volatilidade
+```
+
+Executa o pipeline completo e gera tres artefatos em `backend/analises/ml/artefatos/`:
+- Modelo treinado (`.joblib`)
+- Relatorio comparativo (`.md`)
+- Grafico previsto-vs-realizado (`.png`)
+
+### Metricas e baselines
+
+| Metrica | Uso |
+|---------|-----|
+| RMSE | Funcao de otimizacao (penaliza erros grandes no sigma) |
+| MAE | Leitura de robustez (caudas pesadas reais) |
+
+Baselines a bater: (1) volatilidade historica de 252 pregoes (status quo); (2) GARCH(1,1). Criterio: o modelo deve superar ambos os baselines no holdout cronologico.
+
+### Bloqueador #1 — dados insuficientes para producao
+
+O historico de precos B3 disponivel cobre apenas ~1 ano por commodity (~250 pregoes). Com H=21, o tamanho amostral efetivo e ~30 janelas independentes (pooled). As metricas de holdout obtidas com esse volume sao **direcionais** — nao conclusivas. O treino de producao depende do backfill de historico multi-ano de B3. Este bloqueador permanece aberto.
+
+### Testes
+
+Suite dedicada com 29 testes em `analises/tests/` cobrindo todos os modulos do pipeline ML. Executar com:
+
+```bash
+cd backend && python manage.py test analises -v 2
+```
+
+---
+
 ## Typos nos nomes de modelos (pendente correcao futura)
 
 | Local | Nome atual | Nome correto |
