@@ -21,9 +21,15 @@ def tabela_metricas_md(metricas: dict) -> str:
         f"| Modelo | {metricas.get('modelo_treino_rmse'):.4f} | "
         f"{metricas.get('modelo_treino_mae'):.4f} | {mh_rmse:.4f} | "
         f"{metricas.get('modelo_holdout_mae'):.4f} | - |",
-        f"| Baseline 252d | - | - | {b252_rmse:.4f} | "
-        f"{metricas.get('baseline252_holdout_mae'):.4f} | {bateu_252} |",
     ]
+    if b252_rmse is not None:
+        b252_mae = metricas.get("baseline252_holdout_mae")
+        linhas.append(
+            f"| Baseline 252d | - | - | {b252_rmse:.4f} | "
+            f"{b252_mae:.4f} | {bateu_252} |"
+        )
+    else:
+        linhas.append("| Baseline 252d | - | - | - | - | - |")
     if garch_rmse is not None:
         linhas.append(
             f"| GARCH(1,1) | - | - | {garch_rmse:.4f} | "
