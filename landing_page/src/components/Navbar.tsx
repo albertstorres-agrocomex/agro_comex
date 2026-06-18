@@ -5,6 +5,7 @@ import { Menu, X } from "lucide-react";
 
 const DRIVE_URL = "https://drive.google.com/drive/folders/1sfuOYIuZdYWmvefMX6Qs3aULYiqTZKS_";
 const GITHUB_URL = "https://github.com/albertstorres-agrocomex/agro_comex";
+const PLATFORM_URL = "https://agro-comex-git-hml-torres-projects-3f0de638.vercel.app/";
 
 const links = [
   { label: "Home", href: "#home" },
@@ -94,6 +95,20 @@ export default function Navbar() {
                 </svg>
                 GitHub
               </a>
+              <a
+                href={PLATFORM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 bg-[oklch(0.87_0.185_125)] text-[oklch(0.18_0.08_135)] text-sm font-semibold px-4 py-2 rounded-full hover:brightness-105 transition-all"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                AgroComex
+              </a>
               <button
                 type="button"
                 onClick={() => setExpanded(false)}
@@ -138,24 +153,35 @@ export default function Navbar() {
               + Ver Projeto
             </button>
           ) : (
-            <div className="mt-2 flex gap-2">
+            <div className="mt-2 flex flex-col gap-2">
+              <div className="flex gap-2">
+                <a
+                  href={DRIVE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpen(false)}
+                  className="flex-1 text-center bg-white/10 text-white text-sm font-semibold px-4 py-2.5 rounded-full hover:bg-white/20 transition-all"
+                >
+                  Drive
+                </a>
+                <a
+                  href={GITHUB_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpen(false)}
+                  className="flex-1 text-center bg-white/10 text-white text-sm font-semibold px-4 py-2.5 rounded-full hover:bg-white/20 transition-all"
+                >
+                  GitHub
+                </a>
+              </div>
               <a
-                href={DRIVE_URL}
+                href={PLATFORM_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setOpen(false)}
-                className="flex-1 text-center bg-white/10 text-white text-sm font-semibold px-4 py-2.5 rounded-full hover:bg-white/20 transition-all"
+                className="text-center bg-[oklch(0.87_0.185_125)] text-[oklch(0.18_0.08_135)] text-sm font-semibold px-4 py-2.5 rounded-full hover:brightness-105 transition-all"
               >
-                Drive
-              </a>
-              <a
-                href={GITHUB_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setOpen(false)}
-                className="flex-1 text-center bg-white/10 text-white text-sm font-semibold px-4 py-2.5 rounded-full hover:bg-white/20 transition-all"
-              >
-                GitHub
+                AgroComex
               </a>
             </div>
           )}
