@@ -130,7 +130,11 @@ class BuildAnaliseContextTest(TestCase):
         self.assertEqual(ctx["commodity"], "SojaCtx")
         self.assertEqual(ctx["tipo_derivativo"], "CallCtx")
         self.assertEqual(ctx["status"], "concluido")
-        self.assertAlmostEqual(ctx["preco_exercicio_reais"], 46.0)
+        self.assertEqual(ctx["unidade"], "bushel")
+        self.assertEqual(ctx["posicao"], "nao informada")
+        self.assertEqual(ctx["barreira"], "sem barreira")
+        self.assertAlmostEqual(ctx["preco_exercicio_usd"], 46.0)
+        self.assertAlmostEqual(ctx["preco_mercado_usd"], 45.0)
         self.assertEqual(ctx["quantidade_sacas"], 1000)
 
     def test_quantidade_sacas_none_vira_zero(self):

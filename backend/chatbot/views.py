@@ -19,13 +19,22 @@ def _get_saudacao(hour: int) -> str:
 
 
 def _build_analise_context(analise) -> dict:
+    tipo = analise.tipo_derivativo
+    if tipo.requer_barreira and analise.nivel_barreira:
+        barreira = f"com barreira em USD {analise.nivel_barreira / 100:.2f}"
+    else:
+        barreira = "sem barreira"
     return {
         "analise_id": analise.id,
         "commodity": analise.commodity.nome,
-        "tipo_derivativo": analise.tipo_derivativo.nome,
+        "unidade": analise.commodity.unidade,
+        "tipo_derivativo": tipo.nome,
+        "posicao": analise.posicao or "nao informada",
         "status": analise.status,
-        "preco_exercicio_reais": analise.preco_exercicio / 100,
+        "preco_exercicio_usd": analise.preco_exercicio / 100,
+        "preco_mercado_usd": analise.preco_mercado_atual / 100,
         "quantidade_sacas": analise.quantidade_sacas or 0,
+        "barreira": barreira,
         "data_vencimento": (
             analise.mes_contrato.data_vencimento.strftime("%d/%m/%Y")
             if analise.mes_contrato_id

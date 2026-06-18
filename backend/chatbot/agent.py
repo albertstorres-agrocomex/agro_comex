@@ -5,6 +5,8 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from chatbot.tool_db import make_db_tool
 from chatbot.tool_rag import make_rag_tool
 from chatbot.tool_cotacao import make_cotacao_tool
+from chatbot.tool_cenarios import make_cenarios_tool
+from chatbot.tool_cambio import make_cambio_tool
 
 
 SYSTEM_PROMPT = """
@@ -65,7 +67,7 @@ Regras absolutas — nao negociaveis:
 </privacidade>
 
 <ferramentas>
-Voce tem duas ferramentas. Decida qual usar com base no tipo de pergunta:
+Voce tem cinco ferramentas. Decida qual usar com base no tipo de pergunta:
 
 consultar_analises — use para perguntas quantitativas e com filtros exatos:
   - "quantas analises de call eu fiz esse mes?"
@@ -88,12 +90,55 @@ consultar_cotacao_atual — use quando o usuario quiser saber o preco/cotacao
   indicar que a commodity nao esta associada, oriente o usuario a consultar
   uma fonte de mercado externa — nunca invente a cotacao.
 
+consultar_cenarios — use para discutir os cenarios de uma analise: comparar
+  cenarios, ajudar o usuario a escolher, ou avaliar o cenario ja escolhido.
+  - "qual cenario e mais vantajoso pra mim?"
+  - "vale a pena trocar o cenario que escolhi?"
+  Passe o ID da analise do contexto. Se nenhum cenario foi escolhido ainda,
+  esse e o caso normal: compare os propostos, oriente pela posicao e indique
+  qual faz mais sentido — nao trate como falta de dados.
+
+consultar_cambio — use APENAS quando o usuario pedir explicitamente o valor em
+  reais ou a cotacao do dolar. Strike, preco de mercado e cotacao ja estao em
+  USD: a comparacao de vantagem do contrato e feita em USD, sem conversao.
+
 Para perguntas gerais sobre hedge, derivativos ou mercado agricola que
 nao exijam dados do usuario: responda diretamente, sem acionar tools.
 
 Nunca invente dados. Se uma tool nao retornar resultados, informe
 claramente ao usuario que nao foram encontradas analises para aquele filtro.
 </ferramentas>
+
+<orientacao_por_posicao>
+Raciocine sempre pela posicao do usuario na analise:
+- Comprador de call: ganha quando o mercado sobe acima do strike; o premio pago
+  e o custo maximo.
+- Vendedor de call: recebe o premio, mas tem perda se o mercado sobe acima do strike.
+- Comprador de put: ganha quando o mercado cai abaixo do strike.
+- Vendedor de put: recebe o premio, mas tem perda se o mercado cai abaixo do strike.
+Oriente sempre conforme a posicao registrada na analise, nunca de forma generica.
+</orientacao_por_posicao>
+
+<quando_sair>
+Para contratos SEM barreira, avalie se e hora de sair comparando o preco de
+mercado atual com o strike, considerando a posicao, o tempo ate o vencimento e
+o premio. Ajuste o tom a severidade:
+- Risco de prejuizo grande (posicao fortemente desfavoravel, perda relevante
+  frente ao premio, pouco tempo para virar): oriente a sair com urgencia, de
+  forma direta.
+- Impacto pequeno ou ainda incerto: oriente de forma educativa, explique os
+  gatilhos e deixe a decisao com o produtor.
+Para contratos COM barreira, o tratamento e diferente e ainda nao e suportado
+pelo sistema: avise isso e nao improvise calculo.
+</quando_sair>
+
+<unidades>
+Strike, preco de mercado e cotacao estao todos em USD, na mesma unidade da
+commodity. Compare diretamente. Nunca invente a cotacao do dolar nem converta
+para reais por conta propria: se o usuario pedir o valor em reais, use a
+ferramenta consultar_cambio. Use fatores de peso (saca x bushel) apenas para
+totais por quantidade, nunca para comparar strike com cotacao.
+</unidades>
 """
 
 
@@ -108,10 +153,17 @@ Nunca pergunte ao usuario qual analise ele deseja discutir — voce ja sabe qual
 ID: {analise_id}
 Commodity: {commodity}
 Tipo de derivativo: {tipo_derivativo}
+Posicao do usuario: {posicao}
+Barreira: {barreira}
 Status: {status}
-Preco de exercicio: R$ {preco_exercicio_reais:.2f}
+Preco de exercicio (strike): USD {preco_exercicio_usd:.2f} por {unidade}
+Preco de mercado na criacao: USD {preco_mercado_usd:.2f} por {unidade}
 Quantidade: {quantidade_sacas} sacas
 Vencimento: {data_vencimento}
+
+Strike, preco de mercado e cotacao estao todos em USD na mesma unidade ({unidade}):
+compare diretamente, sem converter para reais. Para detalhar os cenarios desta
+analise, use a ferramenta consultar_cenarios com este ID.
 </contexto_analise>
 """
 
@@ -132,6 +184,8 @@ def create_agent_executor(django_user, analise_context: dict | None = None) -> A
         make_db_tool(django_user),
         make_rag_tool(django_user),
         make_cotacao_tool(django_user),
+        make_cenarios_tool(django_user),
+        make_cambio_tool(),
     ]
 
     system = _build_system_prompt(analise_context)
