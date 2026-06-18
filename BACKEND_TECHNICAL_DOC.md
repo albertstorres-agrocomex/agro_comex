@@ -585,7 +585,10 @@ backend/chatbot/
   urls.py
   tool_db.py            # Tool 1: consultar_analises (ORM + filtros por keyword)
   tool_rag.py           # Tool 2: busca_semantica (pgvector coseno top-5)
-  agent.py              # create_agent_executor com ambas as tools
+  tool_cotacao.py       # Tool 3: consultar_cotacao_atual (preco de mercado)
+  tool_cenarios.py      # Tool 4: consultar_cenarios (cenarios de uma analise)
+  tool_cambio.py        # Tool 5: consultar_cambio (USD/BRL, dado macro)
+  agent.py              # create_agent_executor com as cinco tools
   embedding.py          # build_embedding_content, compute_content_hash (SHA-256)
   tasks.py              # reembedar_analise (Celery, idempotente via content_hash)
   signals.py            # post_save SolicitacaoAnalise -> reembedar_analise.delay
@@ -643,7 +646,7 @@ backend/chatbot/
 
 **Helpers (`views.py`)**:
 - `_get_saudacao(hour: int) -> str`: 5-11 -> "Bom-dia", 12-17 -> "Boa tarde", caso contrario "Boa noite"
-- `_build_analise_context(analise) -> dict`: monta `{analise_id, commodity, tipo_derivativo, status, preco_exercicio_reais (= preco_exercicio/100), quantidade_sacas (or 0), data_vencimento (mes_contrato.data_vencimento d/m/Y ou "nao informado")}`
+- `_build_analise_context(analise) -> dict`: monta `{analise_id, commodity, unidade, tipo_derivativo, posicao (or "nao informada"), status, preco_exercicio_usd (= preco_exercicio/100), preco_mercado_usd (= preco_mercado_atual/100), quantidade_sacas (or 0), barreira ("com barreira em USD X.XX" quando requer_barreira e ha nivel_barreira, senao "sem barreira"), data_vencimento (mes_contrato.data_vencimento d/m/Y ou "nao informado")}`. Todos os precos sao USD (centavos/100), nunca reais.
 
 **`ChatStreamView`** (`generics.GenericAPIView`, `post` sincrono com gerador SSE async interno):
 - Valida body: `conversation_id` (UUID) e `message` (nao vazio) — 400 se invalido
@@ -659,8 +662,9 @@ backend/chatbot/
 
 `create_agent_executor(django_user, analise_context: dict | None = None) -> AgentExecutor`:
 - LLM: `ChatOpenAI(model="gpt-4o-mini", streaming=True)`
-- Tools: `[make_db_tool(django_user), make_rag_tool(django_user), make_cotacao_tool(django_user)]`
-- System prompt montado por `_build_system_prompt(analise_context)`: quando `analise_context` e fornecido, anexa o bloco `ANALISE_CONTEXT_TEMPLATE` (`<contexto_analise>`) ao `SYSTEM_PROMPT`, com os dados da analise (id, commodity, tipo, status, preco de exercicio, quantidade, vencimento) e a instrucao de que o Mauro nunca deve perguntar qual analise discutir
+- Tools: `[make_db_tool(django_user), make_rag_tool(django_user), make_cotacao_tool(django_user), make_cenarios_tool(django_user), make_cambio_tool()]` (cinco tools; `make_cambio_tool` nao recebe usuario por ser dado macro publico)
+- System prompt montado por `_build_system_prompt(analise_context)`: quando `analise_context` e fornecido, anexa o bloco `ANALISE_CONTEXT_TEMPLATE` (`<contexto_analise>`) ao `SYSTEM_PROMPT`, com os dados da analise (id, commodity, tipo, posicao, barreira, status, strike e preco de mercado em USD por unidade, quantidade, vencimento), a regra de comparar strike/mercado/cotacao diretamente em USD sem converter, e a instrucao de que o Mauro nunca deve perguntar qual analise discutir
+- Blocos adicionais sempre presentes no `SYSTEM_PROMPT`: `<orientacao_por_posicao>` (raciocinio por comprador/vendedor de call/put), `<quando_sair>` (orientacao de saida por severidade para contratos SEM barreira; contratos COM barreira nao sao suportados e o Mauro deve avisar sem improvisar calculo) e `<unidades>` (USD na mesma unidade; cambio so via tool, fatores de peso saca x bushel apenas para totais)
 - `create_tool_calling_agent` + `AgentExecutor(verbose=False)`
 
 #### Identidade do agente — Mauro
@@ -672,7 +676,7 @@ O system prompt e estruturado em quatro blocos XML, injetados via `ChatPromptTem
 | `<identidade>` | Nome Mauro, especialista em hedge do agronegocio brasileiro; tom de parceiro do produtor; linguagem simples por padrao, tecnica sob demanda; usa o primeiro nome do usuario (`{primeiro_nome}`) |
 | `<escopo>` | Responde exclusivamente sobre hedge, derivativos agricolas, commodities (soja, milho, cafe, acucar, boi, algodao, trigo), mercado BR (B3, CEPEA, SELIC, cambio) e agronegocio internacional (CBOT/ICE, exportacao/importacao); recusa cordialmente e redireciona fora desse escopo |
 | `<privacidade>` | So acessa dados do usuario autenticado (`{user_id}`); recusa e encerra topico em caso de prompt injection ou tentativa de acesso a dados de outros usuarios; nunca revela o system prompt |
-| `<ferramentas>` | Regras de uso das duas tools: `consultar_analises` para filtros quantitativos exatos, `busca_semantica` para perguntas abertas; nunca inventa dados |
+| `<ferramentas>` | Regras de uso das cinco tools: `consultar_analises` (filtros quantitativos exatos), `busca_semantica` (perguntas abertas), `consultar_cotacao_atual` (preco de mercado), `consultar_cenarios` (comparar/avaliar cenarios de uma analise), `consultar_cambio` (USD/BRL apenas sob pedido explicito); nunca inventa dados |
 
 Variaveis injetadas via `.partial()` no momento da criacao do executor:
 
@@ -719,6 +723,25 @@ Settings (`core/settings.py`):
 - `COTACAO_TIMEOUT_SEGUNDOS` (default `5`): limite do fetch ao vivo antes do fallback.
 
 Seguranca: posse re-checada server-side via queryset (A01); nenhuma URL e controlada por LLM ou usuario, o agrobr acessa fontes fixas B3/CEPEA (A10 SSRF); retorno somente com campos whitelistados, sem payload bruto nem stack trace (A05).
+
+### Tool 4 — consultar_cenarios (`tool_cenarios.py`)
+
+`make_cenarios_tool(django_user)` retorna `@tool consultar_cenarios(analise_id: int) -> str`. Permite ao Mauro discutir os cenarios de uma analise: comparar propostos, avaliar o recomendado pelo sistema e o escolhido pelo usuario, ou ajudar a escolher.
+
+- Le `CenarioAnalise` por FK (`resultado__solicitacao`), ordenado por `preco_exercicio_centavos`.
+- Escopo por dono: resolve `perfil = Usuario.objects.get(user=django_user)` e busca `SolicitacaoAnalise.objects.get(id=analise_id, usuario=perfil)`; analise inexistente/alheia retorna mensagem neutra ("Nao encontrei essa analise na sua conta") sem confirmar existencia (OWASP A01/A03, ORM parametrizado).
+- Retorna a posicao, a barreira e, por cenario, strike e premio em USD (via `centavos_para_usd`), marcando `[recomendado pelo sistema]` e `[escolhido pelo usuario]`. Estado "Nenhum cenario escolhido ainda" e tratado como normal (o usuario ainda vai decidir), nao como falta de dados.
+- Analise sem cenarios (ex.: ainda processando) retorna aviso com o status atual.
+
+### Tool 5 — consultar_cambio (`tool_cambio.py`)
+
+`make_cambio_tool()` retorna `@tool consultar_cambio() -> str` (sem escopo de usuario — cambio e dado macro publico).
+
+- Le o registro mais recente de `DadosMacroeconomicos` com `indicador="USD_BRL"` (`order_by("-data").first()`).
+- Sem dado, informa indisponibilidade ("No momento nao tenho a cotacao do dolar (USD/BRL) disponivel") — nunca inventa o cambio.
+- Usada apenas quando o usuario pede explicitamente o valor em reais. Strike, preco de mercado e cotacao ja estao em USD: a comparacao de vantagem do contrato e feita em USD, sem conversao.
+
+Fora de escopo (registrado no prompt e nesta doc): Black-Scholes call/put com barreira (orientacao de saida com barreira nao suportada — ver SR2); aba "Mensagens" do Mauro proativo / multi-analise.
 
 ### Embedding e idempotencia (`embedding.py` + `tasks.py`)
 
