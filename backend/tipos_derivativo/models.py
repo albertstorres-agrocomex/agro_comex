@@ -18,6 +18,10 @@ class TipoDerivativo(models.Model):
         blank=True,
         help_text="Se preenchido, a posicao e automaticamente definida para este tipo de contrato.",
     )
+    disponivel = models.BooleanField(
+        default=True,
+        help_text="Se False, o tipo nao e ofertado na selecao de nova analise.",
+    )
 
     class Meta:
         db_table = "tipos_derivativo"
