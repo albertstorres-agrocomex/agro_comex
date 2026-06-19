@@ -8,6 +8,16 @@ interface ChatMessageProps {
   isStreaming?: boolean
 }
 
+function renderBold(content: string) {
+  return content.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
+    const match = part.match(/^\*\*([^*]+)\*\*$/)
+    if (match) {
+      return <strong key={index} className="font-semibold">{match[1]}</strong>
+    }
+    return part
+  })
+}
+
 export function ChatMessage({ role, content, isStreaming = false }: ChatMessageProps) {
   const isHuman = role === "human"
 
@@ -26,7 +36,7 @@ export function ChatMessage({ role, content, isStreaming = false }: ChatMessageP
             : "bg-[var(--secondary)] text-[var(--secondary-foreground)]"
         )}
       >
-        <p className="whitespace-pre-wrap break-words">{content}</p>
+        <p className="whitespace-pre-wrap break-words">{renderBold(content)}</p>
         {isStreaming && (
           <span className="inline-block ml-1 h-4 w-0.5 bg-current animate-pulse" />
         )}
