@@ -87,3 +87,54 @@ class TestCenarioAnaliseSerializer(TestCase):
         assert "cenarios" in data
         assert len(data["cenarios"]) == 1
         assert data["cenarios"][0]["nome"] == "moderado"
+
+
+class TestBarreiraNaLeitura(TestCase):
+    def _make_sol(self, requer_barreira, barreira_tipo=None, nivel_barreira=None,
+                  nome="Put", codigo_sufixo="X"):
+        import datetime
+        from analises.models import SolicitacaoAnalise
+        from commodities.models import Comomodity
+        from tipos_derivativo.models import TipoDerivativo
+        from meses_contrato_futuro.models import MesContratoFurturo
+        from usuario.models import Usuario
+        from django.contrib.auth.models import User
+
+        auth_user = User.objects.create_user(username=f"barr_serial_{codigo_sufixo}", password="x")
+        usuario = Usuario.objects.create(first_name="Teste", user=auth_user)
+        commodity = Comomodity.objects.create(
+            nome="Milho", codigo=f"MB{codigo_sufixo}", moeda="USD", unidade="bushel"
+        )
+        tipo = TipoDerivativo.objects.create(
+            nome=nome, rotulo=nome.upper(), requer_posicao=False,
+            requer_barreira=requer_barreira,
+        )
+        mes = MesContratoFurturo.objects.create(
+            commodity=commodity, codigo_mes="Z", ano=2027, ativo=True,
+            data_vencimento=datetime.date(2027, 12, 14),
+            ticket_completo=f"ZCZ27{codigo_sufixo}",
+        )
+        return SolicitacaoAnalise.objects.create(
+            usuario=usuario, commodity=commodity,
+            tipo_derivativo=tipo, mes_contrato=mes,
+            preco_mercado_atual=13000, preco_exercicio=13000,
+            quantidade_sacas=1000, posicao="vendedor",
+            nivel_barreira=nivel_barreira, barreira_tipo=barreira_tipo,
+        )
+
+    def test_expoe_direcao_e_rotulo_para_barreira(self):
+        from analises.serializers import SolicitacaoAnaliseReadSerializer
+        sol = self._make_sol(
+            requer_barreira=True, barreira_tipo="knock_in",
+            nivel_barreira=11000, nome="Put com barreira", codigo_sufixo="A",
+        )  # nivel 110 < spot 130 -> down; knock_in -> down-and-in
+        data = SolicitacaoAnaliseReadSerializer(sol).data
+        assert data["barreira_direcao"] == "down"
+        assert "down-and-in" in data["barreira_rotulo"].lower()
+
+    def test_sem_barreira_campos_nulos(self):
+        from analises.serializers import SolicitacaoAnaliseReadSerializer
+        sol = self._make_sol(requer_barreira=False, nome="Put", codigo_sufixo="B")
+        data = SolicitacaoAnaliseReadSerializer(sol).data
+        assert data["barreira_direcao"] is None
+        assert data["barreira_rotulo"] is None

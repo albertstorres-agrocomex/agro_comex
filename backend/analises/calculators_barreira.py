@@ -16,6 +16,12 @@ def inferir_direcao(H: float, spot: float) -> str:
     raise ValueError("Barreira igual ao spot: configuracao degenerada")
 
 
+def rotulo_barreira(tipo: str, knock: str, direcao: str, nivel_reais: float) -> str:
+    base = "Call" if tipo.lower() == "call" else "Put"
+    knock_lbl = "in" if knock.lower() in ("in", "knock_in") else "out"
+    return f"{base} {direcao.lower()}-and-{knock_lbl}, barreira em R$ {nivel_reais:.2f}"
+
+
 def black_scholes_barreira(
     S: float, K: float, H: float, T: float, r: float, sigma: float,
     tipo: str, knock: str, direcao: str,

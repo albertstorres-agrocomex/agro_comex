@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from analises.models import SolicitacaoAnalise, ResultadoAnalise, CenarioAnalise, PontoCurvaResultado
 from analises.price_utils import usd_para_centavos, centavos_para_usd
+from analises.calculators_barreira import inferir_direcao, rotulo_barreira
 from meses_contrato_futuro.models import MesContratoFurturo as MesContratoFurturoModel
 
 
@@ -112,6 +113,8 @@ class SolicitacaoAnaliseReadSerializer(serializers.ModelSerializer):
     preco_mercado_atual = serializers.SerializerMethodField()
     preco_exercicio = serializers.SerializerMethodField()
     nivel_barreira = serializers.SerializerMethodField()
+    barreira_direcao = serializers.SerializerMethodField()
+    barreira_rotulo = serializers.SerializerMethodField()
     commodity_nome = serializers.CharField(source="commodity.nome", read_only=True)
     commodity_codigo = serializers.CharField(source="commodity.codigo", read_only=True)
     commodity_moeda = serializers.CharField(source="commodity.moeda", read_only=True)
@@ -133,6 +136,18 @@ class SolicitacaoAnaliseReadSerializer(serializers.ModelSerializer):
     def get_nivel_barreira(self, obj):
         return centavos_para_usd(obj.nivel_barreira)
 
+    def get_barreira_direcao(self, obj):
+        if not obj.tipo_derivativo.requer_barreira or not obj.nivel_barreira:
+            return None
+        return inferir_direcao(obj.nivel_barreira / 100.0, obj.preco_mercado_atual / 100.0)
+
+    def get_barreira_rotulo(self, obj):
+        if not obj.tipo_derivativo.requer_barreira or not obj.nivel_barreira or not obj.barreira_tipo:
+            return None
+        tipo = "call" if "call" in obj.tipo_derivativo.nome.lower() else "put"
+        direcao = self.get_barreira_direcao(obj)
+        return rotulo_barreira(tipo, obj.barreira_tipo, direcao, obj.nivel_barreira / 100.0)
+
     class Meta:
         model = SolicitacaoAnalise
         fields = [
@@ -143,6 +158,9 @@ class SolicitacaoAnaliseReadSerializer(serializers.ModelSerializer):
             "quantidade_sacas",
             "posicao",
             "nivel_barreira",
+            "barreira_tipo",
+            "barreira_direcao",
+            "barreira_rotulo",
             "id_tarefa_worker",
             "criado_em",
             "commodity",
