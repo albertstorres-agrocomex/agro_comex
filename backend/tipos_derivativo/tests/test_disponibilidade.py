@@ -13,3 +13,17 @@ class TestCampoDisponivel(TestCase):
             nome="Teste2", rotulo="TST2_T", disponivel=False
         )
         self.assertFalse(tipo.disponivel)
+
+
+class TestSeedForwardSwapIndisponiveis(TestCase):
+    def test_forward_e_swap_indisponiveis(self):
+        self.assertFalse(TipoDerivativo.objects.get(rotulo="FWD").disponivel)
+        self.assertFalse(TipoDerivativo.objects.get(rotulo="SWAP").disponivel)
+
+    def test_apenas_forward_e_swap_desativados(self):
+        indisponiveis = set(
+            TipoDerivativo.objects.filter(disponivel=False).values_list(
+                "rotulo", flat=True
+            )
+        )
+        self.assertEqual(indisponiveis, {"FWD", "SWAP"})
