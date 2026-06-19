@@ -47,6 +47,7 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
   const [mesId, setMesId] = useState<string>("");
   const [posicao, setPosicao] = useState<"comprador" | "vendedor" | "">("");
   const [nivelBarreira, setNivelBarreira] = useState<string>("");
+  const [barreiraTipo, setBarreiraTipo] = useState<"knock_in" | "knock_out" | "">("");
   const [precoExercicio, setPrecoExercicio] = useState<string>("");
   const [quantidade, setQuantidade] = useState<string>("");
   const [unidadeQuantidade, setUnidadeQuantidade] = useState<"sacas" | "toneladas" | "">("");
@@ -90,6 +91,7 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
       setMesId("");
       setPosicao("");
       setNivelBarreira("");
+      setBarreiraTipo("");
       setPrecoExercicio("");
       setQuantidade("");
       setUnidadeQuantidade("");
@@ -101,7 +103,20 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
   useEffect(() => {
     setPosicao("");
     setNivelBarreira("");
+    setBarreiraTipo("");
   }, [tipoId]);
+
+  // Validacao de barreira espelhando o backend: nivel > 0 e != preco de mercado atual.
+  const spotAtual = commodity?.preco_atual ? Number(commodity.preco_atual) : null;
+  const nivelNum = nivelBarreira ? Number(nivelBarreira) : null;
+  const barreiraInvalida =
+    tipo?.requer_barreira && nivelNum !== null
+      ? nivelNum <= 0
+        ? "Informe um nivel de barreira positivo."
+        : spotAtual !== null && nivelNum === spotAtual
+        ? "A barreira nao pode ser igual ao preco de mercado atual."
+        : ""
+      : "";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -134,6 +149,14 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
       setError("Informe o nivel de barreira.");
       return;
     }
+    if (tipo?.requer_barreira && !barreiraTipo) {
+      setError("Selecione o tipo de barreira (knock-in ou knock-out).");
+      return;
+    }
+    if (barreiraInvalida) {
+      setError(barreiraInvalida);
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -147,6 +170,7 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
         unidade_quantidade: unidadeQuantidade as "sacas" | "toneladas",
         posicao: posicao || null,
         nivel_barreira: nivelBarreira ? Number(nivelBarreira) : null,
+        barreira_tipo: tipo?.requer_barreira ? (barreiraTipo || null) : null,
       });
       onCreated();
       onClose();
@@ -316,7 +340,7 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
             </div>
           )}
 
-          {/* Nivel de barreira — condicional */}
+          {/* Barreira — condicional (nivel + tipo knock-in/knock-out) */}
           {tipo?.requer_barreira && (
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Nivel de Barreira</Label>
@@ -327,8 +351,29 @@ export function NovaAnaliseModal({ open, onClose, onCreated, commodities }: Prop
                 value={nivelBarreira}
                 onChange={(e) => setNivelBarreira(e.target.value)}
                 placeholder="Ex: 5.90"
-                className="h-9 text-sm"
+                aria-invalid={barreiraInvalida ? true : undefined}
+                className={`h-9 text-sm ${
+                  barreiraInvalida
+                    ? "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/40"
+                    : ""
+                }`}
               />
+              {barreiraInvalida && (
+                <p className="text-xs text-destructive">{barreiraInvalida}</p>
+              )}
+              <Label className="text-xs font-semibold pt-1.5 block">Tipo de Barreira</Label>
+              <Select
+                value={barreiraTipo}
+                onValueChange={(v) => setBarreiraTipo(v as "knock_in" | "knock_out")}
+              >
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="knock_in">Knock-in (entrada)</SelectItem>
+                  <SelectItem value="knock_out">Knock-out (saida)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           )}
 

@@ -104,6 +104,7 @@ export interface SolicitacaoCreatePayload {
   unidade_quantidade: "sacas" | "toneladas";
   posicao?: "comprador" | "vendedor" | null;
   nivel_barreira?: number | null;
+  barreira_tipo?: "knock_in" | "knock_out" | null;
 }
 
 const BASE = "/api/v1";
