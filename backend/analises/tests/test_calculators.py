@@ -232,6 +232,59 @@ class TestExecutarCalculoBs:
         assert resultado["valor_total_contrato"] is not None
 
 
+class TestSelecionarCalculo:
+    def _make_sol(self, tipo_nome="call", requer_barreira=False, barreira_tipo=None,
+                  nivel_barreira=None, preco_exercicio=13000, qtd=None):
+        from unittest.mock import MagicMock
+        from datetime import date, timedelta
+        sol = MagicMock()
+        sol.tipo_derivativo.nome = tipo_nome
+        sol.tipo_derivativo.requer_barreira = requer_barreira
+        sol.barreira_tipo = barreira_tipo
+        sol.nivel_barreira = nivel_barreira
+        sol.preco_exercicio = preco_exercicio
+        sol.preco_mercado_atual = 13000  # R$130,00
+        sol.quantidade_sacas = qtd
+        sol.mes_contrato.data_vencimento = date.today() + timedelta(days=180)
+        sol.commodity.nome = "Soja"
+        return sol
+
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_sem_barreira_roteia_para_vanilla(self, mock_selic, mock_vol):
+        from analises.calculators import selecionar_calculo, executar_calculo_bs
+        mock_selic.return_value = 0.1075
+        mock_vol.return_value = 0.25
+        sol = self._make_sol(tipo_nome="call", requer_barreira=False)
+        assert selecionar_calculo(sol) == executar_calculo_bs(sol)
+
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_com_barreira_retorna_premio_e_d1_d2_nulos(self, mock_selic, mock_vol):
+        from analises.calculators import selecionar_calculo
+        mock_selic.return_value = 0.1075
+        mock_vol.return_value = 0.25
+        sol = self._make_sol(
+            tipo_nome="put com barreira", requer_barreira=True,
+            barreira_tipo="knock_out", nivel_barreira=11000,  # R$110 < spot R$130 -> down
+        )
+        resultado = selecionar_calculo(sol)
+        chaves_esperadas = {
+            "premio_calculado", "percentual_premio", "valor_total_contrato",
+            "lucro_maximo", "volatilidade_utilizada", "taxa_juros_utilizada", "d1", "d2"
+        }
+        assert set(resultado.keys()) == chaves_esperadas
+        assert resultado["d1"] is None
+        assert resultado["d2"] is None
+        assert resultado["premio_calculado"] >= 0
+
+    def test_forward_continua_levantando(self):
+        from analises.calculators import selecionar_calculo
+        sol = self._make_sol(tipo_nome="forward", requer_barreira=False)
+        with pytest.raises(ValueError):
+            selecionar_calculo(sol)
+
+
 from django.test import TestCase
 
 

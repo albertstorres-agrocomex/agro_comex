@@ -29,8 +29,8 @@ def processar_analise(self, solicitacao_id: int) -> dict:
     solicitacao.save(update_fields=["status"])
 
     try:
-        from analises.calculators import executar_calculo_bs, executar_analise_cenarios
-        resultado = executar_calculo_bs(solicitacao)
+        from analises.calculators import selecionar_calculo, executar_analise_cenarios
+        resultado = selecionar_calculo(solicitacao)
 
         resultado_obj = ResultadoAnalise.objects.create(
             solicitacao=solicitacao,

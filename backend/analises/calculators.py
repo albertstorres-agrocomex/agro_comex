@@ -227,6 +227,80 @@ def executar_calculo_bs(solicitacao) -> dict:
     }
 
 
+def executar_calculo_barreira(solicitacao) -> dict:
+    """Precifica opcao COM barreira, devolvendo o mesmo formato de dict de
+    executar_calculo_bs, com d1/d2 nulos (nao se aplicam a barreira)."""
+    # Import lazy para evitar circular import (calculators_barreira importa _normal_cdf daqui).
+    from analises.calculators_barreira import black_scholes_barreira, inferir_direcao
+
+    tipo_nome = solicitacao.tipo_derivativo.nome.lower()
+    if "call" in tipo_nome:
+        tipo = "call"
+    elif "put" in tipo_nome:
+        tipo = "put"
+    else:
+        raise ValueError(f"Tipo com barreira nao suportado: {tipo_nome}")
+
+    if solicitacao.preco_exercicio is None:
+        raise ValueError("preco_exercicio e obrigatorio para calculo com barreira.")
+    if solicitacao.nivel_barreira is None:
+        raise ValueError("nivel_barreira e obrigatorio para opcao com barreira.")
+    if solicitacao.mes_contrato is None or solicitacao.mes_contrato.data_vencimento is None:
+        raise ValueError("mes_contrato com data_vencimento e obrigatorio.")
+
+    S = solicitacao.preco_mercado_atual / 100.0
+    K = solicitacao.preco_exercicio / 100.0
+    H = solicitacao.nivel_barreira / 100.0
+    T = calcular_tempo_vencimento(solicitacao.mes_contrato.data_vencimento)
+
+    sigma = calcular_volatilidade(solicitacao.commodity)
+    if sigma is None:
+        raise ValueError(
+            f"Dados historicos insuficientes para calcular volatilidade da commodity "
+            f"'{solicitacao.commodity.nome}'."
+        )
+
+    r = obter_taxa_selic()
+    if r is None:
+        raise ValueError("Taxa SELIC nao disponivel em DadosMacroeconomicos.")
+
+    direcao = inferir_direcao(H, S)
+    knock = "in" if solicitacao.barreira_tipo == "knock_in" else "out"
+    premio_reais = black_scholes_barreira(S, K, H, T, r, sigma, tipo, knock, direcao)
+    premio_centavos = round(premio_reais * 100)
+
+    percentual = round((premio_reais / S) * 100, 4) if S > 0 else None
+
+    qtd = solicitacao.quantidade_sacas
+    valor_total = round(premio_centavos * qtd) if qtd else None
+
+    if tipo == "put":
+        lucro_bruto = K - premio_reais
+        lucro_maximo = round(max(lucro_bruto, 0) * 100 * qtd) if qtd else round(max(lucro_bruto, 0) * 100)
+    else:
+        lucro_maximo = None
+
+    return {
+        "premio_calculado":       premio_centavos,
+        "percentual_premio":      Decimal(str(percentual)) if percentual is not None else None,
+        "valor_total_contrato":   valor_total,
+        "lucro_maximo":           lucro_maximo,
+        "volatilidade_utilizada": Decimal(str(round(sigma, 6))),
+        "taxa_juros_utilizada":   Decimal(str(round(r, 6))),
+        "d1":                     None,
+        "d2":                     None,
+    }
+
+
+def selecionar_calculo(solicitacao) -> dict:
+    """Ponto de extensao unico de roteamento de calculo.
+    Vanilla -> executar_calculo_bs; barreira -> executar_calculo_barreira.
+    Forward/swap permanecem nao suportados (ValueError em executar_calculo_bs)."""
+    if solicitacao.tipo_derivativo.requer_barreira:
+        return executar_calculo_barreira(solicitacao)
+    return executar_calculo_bs(solicitacao)
+
+
 FATORES_CENARIO: dict[str, float] = {
     "conservador": 0.90,
     "moderado":    0.99,
