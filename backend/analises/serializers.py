@@ -31,6 +31,7 @@ class SolicitacaoAnaliseCreateSerializer(serializers.ModelSerializer):
             "unidade_quantidade",
             "posicao",
             "nivel_barreira",
+            "barreira_tipo",
         ]
 
     def validate(self, attrs):
@@ -41,10 +42,18 @@ class SolicitacaoAnaliseCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"posicao": "Este tipo de derivativo requer posicao (comprador/vendedor)."}
                 )
-            if tipo.requer_barreira and attrs.get("nivel_barreira") is None:
-                raise serializers.ValidationError(
-                    {"nivel_barreira": "Este tipo de derivativo requer nivel de barreira."}
-                )
+            if tipo.requer_barreira:
+                nivel = attrs.get("nivel_barreira")
+                if nivel is None or nivel <= 0:
+                    raise serializers.ValidationError(
+                        {"nivel_barreira": "Nivel de barreira obrigatorio e deve ser positivo."}
+                    )
+                if not attrs.get("barreira_tipo"):
+                    raise serializers.ValidationError(
+                        {"barreira_tipo": "Informe knock_in ou knock_out para opcoes com barreira."}
+                    )
+            else:
+                attrs["barreira_tipo"] = None
 
         return attrs
 
@@ -82,7 +91,12 @@ class SolicitacaoAnaliseCreateSerializer(serializers.ModelSerializer):
         preco = ultimo if ultimo is not None else 0
 
         if validated_data.get("nivel_barreira") is not None:
-            validated_data["nivel_barreira"] = usd_para_centavos(validated_data["nivel_barreira"])
+            nivel_centavos = usd_para_centavos(validated_data["nivel_barreira"])
+            if tipo.requer_barreira and nivel_centavos == preco:
+                raise serializers.ValidationError(
+                    {"nivel_barreira": "A barreira nao pode ser igual ao preco de mercado atual."}
+                )
+            validated_data["nivel_barreira"] = nivel_centavos
 
         return SolicitacaoAnalise.objects.create(
             usuario=perfil,
