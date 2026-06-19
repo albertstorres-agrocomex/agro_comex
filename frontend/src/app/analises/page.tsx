@@ -5,14 +5,11 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { TopMenu } from "@/components/system/layout/TopMenu";
 import { AnaliseCard } from "@/components/system/analise/AnaliseCard";
-import { AnaliseStatusPieChart } from "@/components/system/analise/AnaliseStatusPieChart";
 import { NovaAnaliseModal } from "@/components/system/analise/NovaAnaliseModal";
 import {
   fetchSolicitacoes,
-  fetchSolicitacaoStatusCount,
   type SolicitacaoAnaliseData,
   type SolicitacaoStatus,
-  type SolicitacaoStatusCount,
 } from "@/services/analiseService";
 import { apiFetch } from "@/services/authService";
 
@@ -38,7 +35,6 @@ export default function AnalisesPage() {
   const { isAuthenticated, isLoading, logout } = useAuth();
 
   const [analises, setAnalises] = useState<SolicitacaoAnaliseData[]>([]);
-  const [statusCount, setStatusCount] = useState<SolicitacaoStatusCount | null>(null);
   const [commodities, setCommodities] = useState<CommodityOption[]>([]);
   const [activeTab, setActiveTab] = useState<"todos" | SolicitacaoStatus>("todos");
   const [page, setPage] = useState(1);
@@ -69,15 +65,6 @@ export default function AnalisesPage() {
     }
   }, [page, activeTab]);
 
-  const loadStatusCount = useCallback(async () => {
-    try {
-      const data = await fetchSolicitacaoStatusCount();
-      setStatusCount(data);
-    } catch {
-      // silencioso
-    }
-  }, []);
-
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push("/");
@@ -85,8 +72,7 @@ export default function AnalisesPage() {
     }
     if (!isAuthenticated) return;
     loadAnalises();
-    loadStatusCount();
-  }, [isLoading, isAuthenticated, router, loadAnalises, loadStatusCount]);
+  }, [isLoading, isAuthenticated, router, loadAnalises]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -104,7 +90,6 @@ export default function AnalisesPage() {
   function handleCreated() {
     setPage(1);
     loadAnalises();
-    loadStatusCount();
   }
 
   if (isLoading) {
@@ -199,25 +184,8 @@ export default function AnalisesPage() {
 
         {/* Coluna direita */}
         <div className="flex flex-col gap-2.5 min-h-0">
-          {/* Grafico de status */}
-          <div className="flex-1 rounded-[var(--radius-2xl)] bg-background overflow-hidden flex flex-col">
-            <div className="px-4 py-3 shrink-0">
-              <h2 className="text-base font-bold text-foreground">Distribuicao</h2>
-            </div>
-            <div className="flex-1 p-4">
-              {statusCount ? (
-                <AnaliseStatusPieChart counts={statusCount} />
-              ) : (
-                <div className="h-full animate-pulse bg-muted rounded-[var(--radius-xl)]" />
-              )}
-            </div>
-          </div>
-
-          {/* Placeholder inferior */}
-          <div
-            className="rounded-[var(--radius-2xl)] bg-background shrink-0"
-            style={{ height: "calc((100vh - 120px) / 3 - 10px)" }}
-          />
+          {/* Placeholder */}
+          <div className="flex-1 rounded-[var(--radius-2xl)] bg-background" />
         </div>
       </div>
 
