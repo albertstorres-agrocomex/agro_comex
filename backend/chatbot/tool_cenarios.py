@@ -59,6 +59,20 @@ def make_cenarios_tool(django_user):
         ]
         if not algum_escolhido:
             linhas.append("Nenhum cenario escolhido ainda — o usuario ainda vai decidir.")
+        if sol.tipo_derivativo.requer_barreira and sol.nivel_barreira and sol.barreira_tipo:
+            from analises.calculators_barreira import inferir_direcao, rotulo_barreira
+            S = sol.preco_mercado_atual / 100.0
+            direcao = inferir_direcao(sol.nivel_barreira / 100.0, S)
+            tipo_op = "call" if "call" in sol.tipo_derivativo.nome.lower() else "put"
+            linhas.append(
+                "Barreira: " + rotulo_barreira(
+                    tipo_op, sol.barreira_tipo, direcao, sol.nivel_barreira / 100.0
+                )
+            )
+            linhas.append(
+                "Semantica: knock-in so 'nasce' se o preco tocar a barreira; "
+                "knock-out 'morre' se tocar. A direcao vem do nivel vs preco atual."
+            )
         for c in cenarios:
             marcas = []
             if c.e_recomendado:
