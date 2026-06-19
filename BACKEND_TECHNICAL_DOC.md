@@ -84,7 +84,9 @@ Funcoes em `analises/calculators.py`:
 | Funcao | Descricao |
 |--------|-----------|
 | `calcular_black_scholes(S, K, T, r, sigma, tipo)` | Precificacao Black-Scholes para call ou put. Retorna premio, percentual, valor total, lucro_maximo. |
-| `executar_analise_cenarios(solicitacao)` | Gera 4 cenarios: 3 strikes automaticos (K-10%, K, K+10%) + 1 cenario `proposto` usando o `preco_exercicio` do usuario. Calcula Black-Scholes para cada um. |
+| `selecionar_calculo(solicitacao)` | Ponto de extensao unico de roteamento: barreira -> `executar_calculo_barreira`; vanilla -> `executar_calculo_bs`. Usado pelo worker e pelos cenarios. |
+| `executar_calculo_barreira(solicitacao)` | Precifica opcao com barreira (delegando a `calculators_barreira.black_scholes_barreira`); devolve o mesmo dict do vanilla com `d1=d2=None`. |
+| `executar_analise_cenarios(solicitacao)` | Gera 4 cenarios: 3 strikes automaticos (K-10%, K, K+10%) + 1 cenario `proposto` usando o `preco_exercicio` do usuario. Roteia via `selecionar_calculo` (para barreira, a barreira fica fixa e so o strike varia). |
 | `calcular_curva_resultado(cenario)` | Gera serie de 25 pontos (`preco_centavos`, `resultado_centavos`) para exibicao da curva de payoff. |
 | `recomendar_cenario(cenarios)` | Seleciona o cenario de maior valor esperado; considera ponto de equilibrio como criterio desempate. |
 | `toneladas_para_sacas(toneladas, commodity)` | Converte toneladas para sacas conforme peso por saca da commodity. |
@@ -107,7 +109,7 @@ Os campos `nivel_barreira` e `posicao` são opcionais no banco mas **obrigatóri
 
 | Condição | Campo obrigatório |
 |----------|------------------|
-| `tipo_derivativo.requer_barreira = true` | `nivel_barreira` deve ser preenchido |
+| `tipo_derivativo.requer_barreira = true` | `nivel_barreira` (> 0 e != preco de mercado) e `barreira_tipo` (`knock_in`/`knock_out`) devem ser preenchidos |
 | `tipo_derivativo.requer_posicao = true` | `posicao` deve ser preenchida (`comprado` ou `vendido`) |
 
 **Esta validação não é garantida pelo banco de dados.** Deve ser implementada:
@@ -447,12 +449,23 @@ O sistema utiliza o modelo Black-Scholes para precificacao de opcoes europeias (
 |------|--------|-----------|--------|
 | Call | `CALL` | Sim | Black-Scholes europeu |
 | Put | `PUT` | Sim | Black-Scholes europeu |
-| Call com Barreira | `CALL-B` | Nao — status `erro` | Exige modelo de opcoes exoticas (Reiner-Rubinstein) |
-| Put com Barreira | `PUT-B` | Nao — status `erro` | Exige modelo de opcoes exoticas (Reiner-Rubinstein) |
+| Call com Barreira | `CALL-B` | Sim | Reiner-Rubinstein em `calculators_barreira.py` (knock-in/out, up/down) |
+| Put com Barreira | `PUT-B` | Sim | Reiner-Rubinstein em `calculators_barreira.py` (knock-in/out, up/down) |
 | Forward | `FWD` | Nao — status `erro` | Exige modelo de cost-of-carry, nao Black-Scholes |
 | Swap | `SWAP` | Nao — status `erro` | Exige modelo de VPL de fluxos descontados |
 
-A rejeicao e feita em `executar_calculo_bs()` com mensagem descritiva antes de qualquer calculo.
+O roteamento e feito por `selecionar_calculo(solicitacao)`: se `tipo_derivativo.requer_barreira`, chama `executar_calculo_barreira` (formula de barreira); caso contrario `executar_calculo_bs` (vanilla). A rejeicao de forward/swap continua em `executar_calculo_bs()` com mensagem descritiva antes de qualquer calculo.
+
+### Opcoes com barreira — Reiner-Rubinstein
+
+Implementadas em `backend/analises/calculators_barreira.py` (stdlib apenas; reusa `_normal_cdf` de `calculators.py`).
+
+- `black_scholes_barreira(S, K, H, T, r, sigma, tipo, knock, direcao)` — precifica as 8 variantes (call/put x in/out x up/down) pela formula de Reiner-Rubinstein. No vencimento (T=0 ou sigma=0): `out` nao tocada vale o intrinseco; `in` nao tocada vale 0.
+- `inferir_direcao(H, spot)` — `down` se barreira abaixo do spot, `up` se acima; `H == spot` levanta `ValueError` (configuracao degenerada).
+- `rotulo_barreira(tipo, knock, direcao, nivel_reais)` — rotulo legivel, ex.: `"Put down-and-in, barreira em R$ 110.00"`. Exposto na API de leitura (`barreira_direcao`, `barreira_rotulo`, `barreira_tipo`) e na tool de cenarios do Mauro.
+- `executar_calculo_barreira(solicitacao)` — devolve o mesmo dict de `executar_calculo_bs`, com `d1=None`/`d2=None`. O campo `barreira_tipo` (migration `analises/0010`) define knock-in/out; a barreira permanece fixa nos cenarios (so o strike varia).
+
+Validacoes (serializer de criacao): `nivel_barreira > 0`, `barreira_tipo` obrigatorio, e `nivel_barreira != preco_mercado_atual` (checado no `create`, em centavos).
 
 ---
 

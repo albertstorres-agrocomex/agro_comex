@@ -496,6 +496,9 @@ interface NovaAnalisePayload {
   preco_exercicio: number
   quantidade: number
   unidade_quantidade: "sacas" | "toneladas"
+  posicao?: "comprador" | "vendedor" | null
+  nivel_barreira?: number | null
+  barreira_tipo?: "knock_in" | "knock_out" | null
 }
 ```
 
@@ -542,6 +545,8 @@ Grafico donut com 4 fatias (pendente, em_analise, aprovado, rejeitado) usando `P
 **Arquivo:** `src/components/system/analise/NovaAnaliseModal.tsx`
 
 Modal acionado pelo botao "Nova Analise" na pagina `/analises`. Formulario com: select de commodity, select de mes de contrato, campo de preco de exercicio, campo de quantidade e radio de unidade (sacas/toneladas). Todos os campos sao obrigatorios. Validacao de NaN e precisao float aplicada antes do submit. Apos submit bem-sucedido fecha o modal e dispara refresh da lista.
+
+Quando o tipo de derivativo selecionado tem `requer_barreira`, o formulario exibe dois campos extras: **Nivel de Barreira** (numero) e **Tipo de Barreira** (select knock-in/knock-out, enviado como `barreira_tipo`). O nivel de barreira tem validacao visual espelhando o backend: deve ser positivo e diferente do preco de mercado atual (`commodity.preco_atual`). Em estado invalido o input usa o token `--destructive` (borda + anel) e uma mensagem inline curta; o estado valido retorna ao normal. As regras de barreira sao reforcadas no backend (serializer de criacao).
 
 ---
 

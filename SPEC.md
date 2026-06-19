@@ -150,7 +150,8 @@ Unique: `(commodity, data_preco, fonte)`. Possivel exclusao futura.
 | mes_contrato | ForeignKey (MesContratoFurturo) | PROTECT — obrigatorio na criacao |
 | preco_mercado_atual | IntegerField | |
 | posicao | CharField(12) | nullable — obrigatorio se requer_posicao |
-| nivel_barreira | IntegerField | nullable — obrigatorio se requer_barreira |
+| nivel_barreira | IntegerField | nullable — obrigatorio se requer_barreira (em centavos) |
+| barreira_tipo | CharField(10) | nullable — choices: knock_in / knock_out — obrigatorio se requer_barreira (migration `analises/0010`) |
 | preco_exercicio | IntegerField | Strike da opcao em centavos — obrigatorio na criacao |
 | quantidade_sacas | IntegerField | Volume do contrato em numero de sacas — obrigatorio na criacao |
 | unidade_quantidade | CharField | Unidade informada pelo usuario (sacas ou toneladas) — obrigatorio na criacao |
@@ -159,6 +160,8 @@ Unique: `(commodity, data_preco, fonte)`. Possivel exclusao futura.
 | criado_em | DateTimeField | auto_now_add |
 
 Regra de validacao: `posicao` e `nivel_barreira` sao obrigatorios se o `TipoDerivativo` correspondente tiver `requer_posicao=True` / `requer_barreira=True`. Os campos `preco_exercicio`, `quantidade_sacas`, `unidade_quantidade` e `mes_contrato` sao sempre obrigatorios na criacao (validados no serializer).
+
+Regras adicionais para opcoes com barreira (`requer_barreira=True`), validadas no serializer de criacao: `nivel_barreira` deve ser positivo (`> 0`); `barreira_tipo` (`knock_in`/`knock_out`) e obrigatorio; o `nivel_barreira` nao pode ser igual ao `preco_mercado_atual` (verificado no `create`, em centavos, pois o spot vem do cache). A direcao up/down e inferida do nivel vs spot (nivel abaixo do spot = down, acima = up; igual = configuracao degenerada rejeitada). Sao 8 variantes (call/put x in/out x up/down) precificadas por Reiner-Rubinstein. No vencimento (T=0): opcao `out` nao tocada vale o intrinseco; opcao `in` nao tocada vale 0.
 
 #### `analises.ResultadoAnalise`
 | Campo | Tipo | Obs |
@@ -290,7 +293,8 @@ O pior resultado prevalece (`INVALIDO > SUSPEITO > OK`). Multiplos motivos sao c
 | App | Modulo | Arquivo | Descricao |
 |-----|--------|---------|-----------|
 | `analises` | Tarefas | `analises/tasks.py` | `processar_analise` — task principal de precificacao com cenarios |
-| `analises` | Calculadoras | `analises/calculators.py` | Black-Scholes, `executar_analise_cenarios`, `calcular_curva_resultado`, `recomendar_cenario`, `toneladas_para_sacas` |
+| `analises` | Calculadoras | `analises/calculators.py` | Black-Scholes vanilla, `selecionar_calculo` (roteia vanilla vs barreira), `executar_calculo_barreira`, `executar_analise_cenarios`, `calcular_curva_resultado`, `recomendar_cenario`, `toneladas_para_sacas` |
+| `analises` | Calculadora de barreira | `analises/calculators_barreira.py` | `black_scholes_barreira` (Reiner-Rubinstein, 8 variantes), `inferir_direcao`, `rotulo_barreira` |
 | `dados` | Servico | `dados/servicos.py` | `persistir_cache_dados_mercado` — upsert de cache com validacao de qualidade |
 | `dados` | Tarefas externas | `dados/tasks/agrobr.py` | Integracao B3 e CEPEA |
 | `dados` | Tarefas externas | `dados/tasks/bcb.py` | Integracao BCB (cambio, SELIC, IPCA) |

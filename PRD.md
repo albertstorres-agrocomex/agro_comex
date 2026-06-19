@@ -49,6 +49,7 @@ Plataforma de inteligencia para o agronegocio com foco em comercio exterior, int
 - [x] Celery + Redis configurados para processamento assincrono de analises
 - [x] Tarefa Celery `processar_analise` com retry automatico (max 3x) e transicao de estados
 - [x] Precificacao Black-Scholes implementada para call e put (`backend/analises/calculators.py`)
+- [x] Opcoes CALL/PUT com barreira (knock-in/knock-out, up/down) via Reiner-Rubinstein em modulo isolado (`backend/analises/calculators_barreira.py`); seletor `selecionar_calculo` roteia vanilla vs barreira; direcao up/down inferida do nivel vs spot; campo `barreira_tipo` (migration `analises/0010`). Forward/swap e Mauro proativo seguem pendentes.
 - [x] Motor de cenarios: `executar_analise_cenarios` com 3 strikes automaticos e curva de resultado
 - [x] Recomendacao automatica de cenario por criterio de maior valor e ponto de equilibrio
 - [x] Calculo de curva de resultado para todas as posicoes de opcao (`calcular_curva_resultado`)
@@ -63,7 +64,7 @@ Plataforma de inteligencia para o agronegocio com foco em comercio exterior, int
 - [x] Seed de meses de contrato futuro 2026-2028 por commodity (migration `tipos_derivativo/0003`)
 - [x] Seed de tipos de derivativo (migration `tipos_derivativo/0003_seed`)
 - [x] Cenario `proposto` gerado automaticamente em `executar_analise_cenarios` usando o `preco_exercicio` informado pelo usuario (migration `analises/0009`)
-- [x] Diferenciacacao de erros em `executar_calculo_bs`: tipos com barreira -> ValueError "nao suportado (futuro Reiner-Rubinstein)"; forward/swap -> ValueError "nao suportado (futuro)"; outros -> ValueError "nao reconhecido"
+- [x] Diferenciacacao de erros em `executar_calculo_bs`: forward/swap -> ValueError "nao suportado (futuro)"; outros -> ValueError "nao reconhecido". Opcoes com barreira deixaram de cair nesse erro e passaram a ser precificadas por `executar_calculo_barreira` via `selecionar_calculo`.
 - [x] Pipeline de qualidade de dados com `QualidadeDado` enum, `validar_preco`, `validar_macro`, `validar_exportacao` (`dados/validacao/qualidade.py`)
 - [x] Modulo de conversao de unidade por fonte (`dados/limpeza/conversao.py`) com fatores fisicos B3/CEPEA
 
