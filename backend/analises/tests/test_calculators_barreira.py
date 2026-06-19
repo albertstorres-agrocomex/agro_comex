@@ -55,3 +55,13 @@ class TestVencimento:
     def test_T_zero_in_vale_zero(self):
         preco = black_scholes_barreira(110.0, 100.0, 90.0, 0.0, R, SIG, "call", "in", "down")
         assert preco == 0.0
+
+
+@pytest.mark.django_db
+class TestBarreiraTipoField:
+    def test_choices_aceitos(self):
+        from analises.models import SolicitacaoAnalise
+        campo = SolicitacaoAnalise._meta.get_field("barreira_tipo")
+        valores = {c[0] for c in campo.choices}
+        assert valores == {"knock_in", "knock_out"}
+        assert campo.null is True

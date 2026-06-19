@@ -39,6 +39,15 @@ class SolicitacaoAnalise(models.Model):
     quantidade_sacas = models.IntegerField(null=True, blank=True)
     posicao = models.CharField(max_length=12, null=True, blank=True)
     nivel_barreira = models.IntegerField(null=True, blank=True)
+    KNOCK_IN = "knock_in"
+    KNOCK_OUT = "knock_out"
+    BARREIRA_TIPO_CHOICES = [
+        (KNOCK_IN, "Knock-in (entrada)"),
+        (KNOCK_OUT, "Knock-out (saida)"),
+    ]
+    barreira_tipo = models.CharField(
+        max_length=10, choices=BARREIRA_TIPO_CHOICES, null=True, blank=True
+    )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.AGUARDANDO)
     id_tarefa_worker = models.CharField(max_length=100, null=True, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
