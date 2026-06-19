@@ -111,6 +111,12 @@ agro_comex/
 | descricao | TextField | nullable |
 | requer_barreira | BooleanField | default False |
 | requer_posicao | BooleanField | default False |
+| disponivel | BooleanField | default True |
+
+- Os tipos Forward e Swap nao sao ofertados na selecao de nova analise: o endpoint
+  de listagem de tipos retorna apenas registros com `disponivel=True`, e Forward
+  (FWD) e Swap (SWAP) estao com `disponivel=False`. Mesmo se submetidos via API
+  direta, o backend os rejeita no calculo (`executar_calculo_bs` levanta ValueError).
 
 #### `meses_contrato_futuro.MesContratoFurturo` (*)
 | Campo | Tipo | Obs |

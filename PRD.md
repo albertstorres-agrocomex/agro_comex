@@ -109,3 +109,11 @@ Plataforma de inteligencia para o agronegocio com foco em comercio exterior, int
 - [ ] Implementacao do modulo FedPredict (ML federado)
 - [ ] Corracao de typos nos nomes de modelos Django (Comomodity, MesContratoFurturo)
 - [ ] Expandir cobertura de testes (atualmente apenas validacao de campos em SolicitacaoAnalise)
+
+### Fora de escopo — melhorias futuras
+
+- **Forward e Swap:** removidos da selecao de nova analise em 2026-06-19. Dependem
+  de uma camada de curva de futuros por vencimento ainda inexistente (ver
+  BACKEND_TECHNICAL_DOC.md, secao Forward/Swap). Forward seguiria o modelo de carrego
+  calibrado do futuro B3; Swap, VPL multi-periodo sobre a curva de forwards. CALL,
+  PUT e opcoes com barreira permanecem em producao.

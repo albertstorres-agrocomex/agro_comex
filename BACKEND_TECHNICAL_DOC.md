@@ -469,7 +469,19 @@ Validacoes (serializer de criacao): `nivel_barreira > 0`, `barreira_tipo` obriga
 
 ---
 
-### Modelos para implementacao futura
+### Modelos para implementacao futura — Forward e Swap (ADIADO)
+
+> Status (2026-06-19): ADIADO. Forward e Swap foram removidos da selecao de nova
+> analise (campo `TipoDerivativo.disponivel=False` para os rotulos FWD e SWAP; o
+> endpoint `GET /api/v1/tipos_derivativo/` lista apenas `disponivel=True`). O
+> backend continua rejeitando esses tipos no calculo (`executar_calculo_bs`).
+>
+> Bloqueio: ambas as familias dependem de uma curva de futuros por vencimento que
+> NAO existe hoje. `CacheDadosMercado` guarda preco por commodity + data, sem
+> dimensao de vencimento; a task `atualizar_futuros_b3` recebe vencimento do agrobr
+> mas `normalizar_futuros_b3` o descarta. Essa camada de curva a termo e
+> pre-requisito COMPARTILHADO de Forward e Swap. Reativar = persistir o vencimento
+> na ingestao + backfill, depois flipar `disponivel` para True.
 
 #### Call com Barreira / Put com Barreira — Reiner-Rubinstein (1991)
 
