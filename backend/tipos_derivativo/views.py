@@ -4,5 +4,5 @@ from tipos_derivativo.serializers import TipoDerivativoSerializer
 
 
 class TipoDerivativoViewSet (viewsets.ModelViewSet):
-    queryset = TipoDerivativo.objects.all()
+    queryset = TipoDerivativo.objects.filter(disponivel=True)
     serializer_class = TipoDerivativoSerializer

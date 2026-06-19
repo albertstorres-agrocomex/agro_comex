@@ -1,6 +1,7 @@
 from django.test import TestCase
 
 from tipos_derivativo.models import TipoDerivativo
+from tipos_derivativo.views import TipoDerivativoViewSet
 
 
 class TestCampoDisponivel(TestCase):
@@ -27,3 +28,14 @@ class TestSeedForwardSwapIndisponiveis(TestCase):
             )
         )
         self.assertEqual(indisponiveis, {"FWD", "SWAP"})
+
+
+class TestViewSetFiltraDisponiveis(TestCase):
+    def test_queryset_exclui_indisponiveis(self):
+        TipoDerivativo.objects.create(nome="DispTrue", rotulo="DT_T", disponivel=True)
+        TipoDerivativo.objects.create(nome="DispFalse", rotulo="DF_T", disponivel=False)
+        rotulos = set(
+            TipoDerivativoViewSet().get_queryset().values_list("rotulo", flat=True)
+        )
+        self.assertIn("DT_T", rotulos)
+        self.assertNotIn("DF_T", rotulos)
