@@ -349,7 +349,9 @@ def executar_analise_cenarios(solicitacao) -> list[dict]:
         clone = deepcopy(solicitacao)
         clone.preco_exercicio = K_centavos
 
-        resultado_bs = executar_calculo_bs(clone)
+        # selecionar_calculo roteia vanilla vs barreira; para barreira a barreira
+        # permanece fixa (nivel_barreira do clone), variando apenas o strike.
+        resultado_bs = selecionar_calculo(clone)
 
         K = K_centavos / 100.0
         premio = resultado_bs["premio_calculado"] / 100.0
@@ -366,7 +368,7 @@ def executar_analise_cenarios(solicitacao) -> list[dict]:
     # Cenario proposto: usa o preco_exercicio do usuario diretamente como K
     K_proposto_centavos = solicitacao.preco_exercicio
     clone_proposto = deepcopy(solicitacao)
-    resultado_proposto = executar_calculo_bs(clone_proposto)
+    resultado_proposto = selecionar_calculo(clone_proposto)
 
     K_proposto = K_proposto_centavos / 100.0
     premio_proposto = resultado_proposto["premio_calculado"] / 100.0

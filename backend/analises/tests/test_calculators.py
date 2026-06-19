@@ -451,11 +451,13 @@ class TestRecomendarCenario:
 
 
 class TestExecutarAnaliseCenarios:
-    def _make_solicitacao(self, tipo_nome="put", posicao="vendedor", qtd=1000):
+    def _make_solicitacao(self, tipo_nome="put", posicao="vendedor", qtd=1000,
+                          requer_barreira=False):
         from unittest.mock import MagicMock
         from datetime import date, timedelta
         sol = MagicMock()
         sol.tipo_derivativo.nome = tipo_nome
+        sol.tipo_derivativo.requer_barreira = requer_barreira
         sol.preco_mercado_atual = 13000  # R$130,00
         sol.preco_exercicio = 13000
         sol.quantidade_sacas = qtd
@@ -522,6 +524,30 @@ class TestExecutarAnaliseCenarios:
         resultado = executar_analise_cenarios(sol)
         recomendados = [c for c in resultado if c["e_recomendado"]]
         assert len(recomendados) == 1
+
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_cenarios_barreira_usam_barreira_fixa(self, mock_selic, mock_vol):
+        from analises.calculators import executar_analise_cenarios
+        mock_selic.return_value = 0.1075
+        mock_vol.return_value = 0.25
+
+        sol = self._make_solicitacao(tipo_nome="put com barreira", requer_barreira=True)
+        sol.barreira_tipo = "knock_out"
+        sol.nivel_barreira = 11000  # R$110 < spot R$130 -> down, fixa em todos os cenarios
+        resultado = executar_analise_cenarios(sol)
+
+        cenarios_fixos = [c for c in resultado if c["nome"] != "proposto"]
+        strikes = [c["preco_exercicio_centavos"] for c in cenarios_fixos]
+        assert len(set(strikes)) == 3  # barreira fixa, strike varia
+
+        # Premio vem da formula de barreira: down-and-out put e mais barato que o vanilla.
+        sol_vanilla = self._make_solicitacao(tipo_nome="put", requer_barreira=False)
+        resultado_vanilla = executar_analise_cenarios(sol_vanilla)
+        cons_barr = next(c for c in resultado if c["nome"] == "conservador")
+        cons_van = next(c for c in resultado_vanilla if c["nome"] == "conservador")
+        assert cons_barr["premio_centavos"] != cons_van["premio_centavos"]
+        assert cons_barr["premio_centavos"] < cons_van["premio_centavos"]
 
     @patch("analises.calculators.calcular_volatilidade")
     @patch("analises.calculators.obter_taxa_selic")
