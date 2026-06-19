@@ -176,7 +176,6 @@ function FloatingField({ id, type, label, icon, value, onChange, autoComplete }:
           "w-full pl-9 pr-3 pt-5 pb-2",
           "rounded-xl border text-sm text-primary-foreground",
           "outline-none transition-colors duration-300",
-          "placeholder-transparent",
           focused
             ? "border-accent/70"
             : "border-white/10 hover:border-white/20"
@@ -186,7 +185,6 @@ function FloatingField({ id, type, label, icon, value, onChange, autoComplete }:
           WebkitBoxShadow: "0 0 0 1000px rgba(23, 44, 29, 1) inset",
           WebkitTextFillColor: "rgba(255,255,255,0.9)",
         }}
-        placeholder={label}
       />
 
       <label
