@@ -247,10 +247,14 @@ class ProativoNaoLidasView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        total = ConversationMessage.objects.filter(
+        nao_lidas = ConversationMessage.objects.filter(
             conversation__user=request.user, is_proativa=True, lida_em__isnull=True
-        ).count()
-        return Response({"nao_lidas": total})
+        )
+        solicitacoes = list(
+            nao_lidas.exclude(solicitacao__isnull=True)
+            .values_list("solicitacao_id", flat=True).distinct()
+        )
+        return Response({"nao_lidas": nao_lidas.count(), "solicitacoes": solicitacoes})
 
 
 class ProativoMarcarLidasView(generics.GenericAPIView):
