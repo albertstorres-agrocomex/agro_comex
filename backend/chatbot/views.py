@@ -45,6 +45,18 @@ def _build_analise_context(analise) -> dict:
     }
 
 
+def _frame_cards(output):
+    if not isinstance(output, str):
+        return None
+    try:
+        dados = json.loads(output)
+    except (ValueError, TypeError):
+        return None
+    if isinstance(dados, dict) and dados.get("tipo") == "cards":
+        return f"data: {json.dumps(dados)}\n\n"
+    return None
+
+
 class ConversationCreateView(generics.GenericAPIView):
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated]
@@ -158,11 +170,20 @@ class ChatStreamView(generics.GenericAPIView):
             else:
                 history.append(AIMessage(content=msg.content))
 
-        analise_context = (
-            _build_analise_context(conversation.analise)
-            if conversation.analise_id
-            else None
-        )
+        # Contexto por turno: analise_id no corpo sobrepoe o FK da conversa
+        analise_id = body.get("analise_id")
+        analise_context = None
+        if analise_id:
+            analise = SolicitacaoAnalise.objects.filter(
+                id=analise_id, usuario__user=request.user
+            ).select_related(
+                "commodity", "tipo_derivativo", "mes_contrato"
+            ).first()
+            if analise:
+                analise_context = _build_analise_context(analise)
+        elif conversation.analise_id:
+            analise_context = _build_analise_context(conversation.analise)
+
         agent_executor = create_agent_executor(request.user, analise_context)
 
         async def event_stream():
@@ -178,6 +199,15 @@ class ChatStreamView(generics.GenericAPIView):
                         if content:
                             full_response += content
                             yield f"data: {json.dumps({'content': content})}\n\n"
+                    elif (
+                        event["event"] == "on_tool_end"
+                        and event.get("name") == "listar_analises"
+                    ):
+                        raw_output = event["data"].get("output")
+                        tool_output = getattr(raw_output, "content", raw_output)
+                        frame = _frame_cards(tool_output)
+                        if frame:
+                            yield frame
             finally:
                 await ConversationMessage.objects.acreate(
                     conversation=conversation, role="human", content=message
