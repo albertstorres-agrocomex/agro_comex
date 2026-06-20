@@ -1,9 +1,10 @@
 # backend/chatbot/proativo/deteccao.py
+import datetime as dt
 import logging
 
 from celery import shared_task
 
-from analises.models import SolicitacaoAnalise
+from analises.models import ResultadoAnalise, SolicitacaoAnalise
 from dados.servicos import obter_cotacao_cache
 from chatbot.models import Conversation, ConversationMessage, EstadoAlertaAnalise
 from chatbot.proativo import regras, templates
@@ -62,16 +63,52 @@ def _avaliar_strike(analise):
         registro.save(update_fields=["ultimo_estado", "atualizado_em"])
 
 
+def _avaliar_melhor_momento(analise):
+    cotacao = obter_cotacao_cache(analise.commodity)
+    if not cotacao:
+        return
+    spot = cotacao["preco_usd"]
+    strike = analise.preco_exercicio / 100
+    intrinseco = regras.valor_intrinseco_usd(analise.tipo_derivativo.nome, spot, strike)
+
+    sinais = []
+    if analise.nivel_barreira and regras.proximo_knockout(spot, analise.nivel_barreira / 100, analise.barreira_tipo or ""):
+        sinais.append("knockout")
+    resultado = ResultadoAnalise.objects.filter(solicitacao=analise).order_by("-calculado_em").first()
+    if resultado and regras.intrinseco_relevante(intrinseco, resultado.premio_calculado / 100):
+        sinais.append("intrinseco")
+    if analise.mes_contrato_id and analise.mes_contrato.data_vencimento:
+        dias = regras.dias_uteis_ate(analise.mes_contrato.data_vencimento, dt.date.today())
+        if regras.proximo_vencimento(dias, intrinseco):
+            sinais.append("vencimento")
+
+    estado = "disparado" if sinais else "normal"
+    registro, criado = EstadoAlertaAnalise.objects.get_or_create(
+        solicitacao=analise, tipo_alerta="melhor_momento",
+        defaults={"ultimo_estado": estado},
+    )
+    if criado:
+        if estado == "disparado":
+            _emitir(analise, "melhor_momento", templates.melhor_momento(analise, sinais, spot))
+        return
+    if estado != registro.ultimo_estado:
+        if estado == "disparado":
+            _emitir(analise, "melhor_momento", templates.melhor_momento(analise, sinais, spot))
+        registro.ultimo_estado = estado
+        registro.save(update_fields=["ultimo_estado", "atualizado_em"])
+
+
 @shared_task
 def varrer_alertas_proativos():
     qs = SolicitacaoAnalise.objects.filter(status__in=STATUS_ATIVOS).select_related(
-        "commodity", "usuario", "usuario__user"
+        "commodity", "usuario", "usuario__user", "tipo_derivativo", "mes_contrato"
     )
     total = 0
     for analise in qs:
         try:
             _avaliar_cenario(analise)
             _avaliar_strike(analise)
+            _avaliar_melhor_momento(analise)
             total += 1
         except Exception:
             logger.exception("falha ao avaliar analise proativa %s", analise.id)
