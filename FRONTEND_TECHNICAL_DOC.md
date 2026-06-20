@@ -568,17 +568,23 @@ Servico HTTP do chatbot. Usa `apiFetch` com Bearer token automatico.
 - Body montado condicionalmente: inclui `analise_id` apenas se `analiseId !== undefined` e `client_hour` apenas se `clientHour !== undefined`
 - Retorna `greeting` (saudacao contextual gerada pelo backend) ou `null`
 
-**`streamMessage(conversationId, message, onChunk, onDone): Promise<void>`**
-- `POST /api/v1/chat/stream/` com `{ conversation_id, message }`
+**`type AnaliseCard = { id: number; commodity_nome: string; tipo_derivativo_nome: string; status: string }`** — card de analise alinhado ao `SolicitacaoAnaliseReadSerializer` do backend. O frame `cards` do stream SSE (tool `listar_analises`) envia `{id, commodity, tipo, status}` e e normalizado para este shape no frontend (`streamMessage`).
+
+**`streamMessage(conversationId, message, onChunk, onDone, opts): Promise<void>`** — `opts: { analiseId?: number; onCards?: (cards: AnaliseCard[]) => void } = {}`
+- `POST /api/v1/chat/stream/` com `{ conversation_id, message }` (inclui `analise_id` quando `opts.analiseId` definido)
 - Usa `res.body.getReader()` + `TextDecoder` para consumir SSE
 - Buffer acumula chunks, divide por `\n`, processa linhas `data: ...`
-- Chama `onChunk(content)` a cada chunk JSON valido; `onDone()` ao receber `[DONE]`
+- Se o JSON tem `tipo === "cards"` e `opts.onCards` existe, chama `opts.onCards(dados.payload)`; caso contrario chama `onChunk(content)` a cada chunk; `onDone()` ao receber `[DONE]`
+
+**`getProativoAnalises(filtro): Promise<{ analises: AnaliseCard[] }>`** — `filtro: { commodity?: string; tipo?: string; status?: string }`
+- `GET /api/v1/chat/proativo/analises/`
+- Lista analises do usuario para o `AnaliseCardPicker`
 
 **`interface ProativoMessage`** — tipo para mensagens proativas: `id`, `role`, `content`, `created_at`, `is_proativa`, `tipo_alerta`, `lida_em`, `solicitacao`.
 
-**`getProativoNaoLidas(): Promise<{ nao_lidas: number }>`**
+**`getProativoNaoLidas(): Promise<{ nao_lidas: number; solicitacoes: number[] }>`**
 - `GET /api/v1/chat/proativo/nao-lidas/`
-- Retorna contagem de mensagens proativas nao lidas
+- Retorna a contagem (`nao_lidas`) e a lista `solicitacoes` (IDs de analises com mensagem proativa nao lida — usada para o prompt de permissao mid-conversa)
 
 **`getProativoConversa(): Promise<{ conversation_id, messages: ProativoMessage[] }>`**
 - `GET /api/v1/chat/proativo/`
@@ -610,6 +616,8 @@ Nota: o valor de dado `role="ai"` permanece inalterado (enum do model/DB); apena
 **Arquivo:** `src/components/system/chat/TypingIndicator.tsx`
 
 Indicador "Mauro esta digitando" exibido enquanto a saudacao contextual e gerada no backend e tambem enquanto o Mauro prepara cada resposta (entre o envio da mensagem do usuario e o primeiro chunk do stream). Segue o padrao visual do `ChatMessage`: avatar "M" (`bg-[var(--primary)]`), bolha `bg-[var(--secondary)]` e tres pontos animados (`animate-bounce` com delays escalonados). `role="status"` + `aria-label` para acessibilidade. Apenas tokens do styleguide; dark mode via tokens.
+
+Prop opcional `label?: string` (Fase 2): quando informado, substitui o texto padrao do indicador — usado em `/messages` para exibir "conferindo atualizacao..." durante a conferencia mid-conversa.
 
 ---
 
@@ -672,6 +680,27 @@ Pagina dedicada ao thread de mensagens proativas do Mauro. Requer autenticacao.
 - No mount, chama `getProativoConversa()` para carregar a thread e `marcarProativoLidas()` para zerar o badge
 - Mensagens proativas destacadas visualmente com o token `--accent`
 - O usuario pode responder via `streamMessage` existente, usando o `conversation_id` da conversa proativa
+
+**Fase 2 — selecao de analise, filtro NL e permissao mid-conversa:**
+
+- Renderiza `<AnaliseCardPicker analises={cards} onSelecionar={(id) => setAnaliseId(id)} />` enquanto nenhuma analise esta selecionada (`!analiseId`)
+- Ao enviar, chama `streamMessage(..., { analiseId: analiseId ?? undefined, onCards: (c) => setCards(c) })`; o `onCards` recebe os cards do frame `cards` do stream e atualiza o estado `cards`. O filtro em linguagem natural ocorre via a tool `listar_analises` do agente, que devolve os cards filtrados
+- `<TypingIndicator label={conferindo ? "conferindo atualizacao..." : undefined} />` durante a conferencia
+- Permissao mid-conversa: `useEffect` com polling a cada 45s chama `getProativoNaoLidas()` e, se `solicitacoes.includes(analiseId)`, abre o prompt ("Chegou dado novo sobre essa analise. Quer que eu confira agora?") com os botoes "Sim" (`confirmarPermissao` — `marcarProativoLidas()` e dispara `enviar(...)` perguntando se a analise mudou) e "Agora nao" (`negarPermissao` — `marcarProativoLidas()` sem enviar)
+
+---
+
+### AnaliseCardPicker
+
+**Arquivo:** `src/components/system/chat/AnaliseCardPicker.tsx`
+
+Grade de cards para o usuario escolher a analise a discutir antes de iniciar a conversa proativa.
+
+Props: `analises: AnaliseCard[]`, `onSelecionar: (id: number) => void`
+
+- Retorna `null` quando `analises.length === 0`
+- Grade `grid grid-cols-2 gap-2 sm:grid-cols-3`; cada item e um `<button>` envolvendo um `<Card>` com `commodity_nome` (negrito), `tipo_derivativo_nome` e `status` (mutados)
+- Clique chama `onSelecionar(a.id)`
 
 ---
 

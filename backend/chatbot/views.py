@@ -9,6 +9,7 @@ from chatbot.models import Conversation, ConversationMessage
 from chatbot.serializers import ConversationSerializer, ProativoMessageSerializer
 from chatbot.agent import create_agent_executor
 from analises.models import SolicitacaoAnalise
+from analises.serializers import SolicitacaoAnaliseReadSerializer
 
 
 def _get_saudacao(hour: int) -> str:
@@ -42,6 +43,18 @@ def _build_analise_context(analise) -> dict:
             else "nao informado"
         ),
     }
+
+
+def _frame_cards(output):
+    if not isinstance(output, str):
+        return None
+    try:
+        dados = json.loads(output)
+    except (ValueError, TypeError):
+        return None
+    if isinstance(dados, dict) and dados.get("tipo") == "cards":
+        return f"data: {json.dumps(dados)}\n\n"
+    return None
 
 
 class ConversationCreateView(generics.GenericAPIView):
@@ -157,11 +170,20 @@ class ChatStreamView(generics.GenericAPIView):
             else:
                 history.append(AIMessage(content=msg.content))
 
-        analise_context = (
-            _build_analise_context(conversation.analise)
-            if conversation.analise_id
-            else None
-        )
+        # Contexto por turno: analise_id no corpo sobrepoe o FK da conversa
+        analise_id = body.get("analise_id")
+        analise_context = None
+        if analise_id:
+            analise = SolicitacaoAnalise.objects.filter(
+                id=analise_id, usuario__user=request.user
+            ).select_related(
+                "commodity", "tipo_derivativo", "mes_contrato"
+            ).first()
+            if analise:
+                analise_context = _build_analise_context(analise)
+        elif conversation.analise_id:
+            analise_context = _build_analise_context(conversation.analise)
+
         agent_executor = create_agent_executor(request.user, analise_context)
 
         async def event_stream():
@@ -177,6 +199,15 @@ class ChatStreamView(generics.GenericAPIView):
                         if content:
                             full_response += content
                             yield f"data: {json.dumps({'content': content})}\n\n"
+                    elif (
+                        event["event"] == "on_tool_end"
+                        and event.get("name") == "listar_analises"
+                    ):
+                        raw_output = event["data"].get("output")
+                        tool_output = getattr(raw_output, "content", raw_output)
+                        frame = _frame_cards(tool_output)
+                        if frame:
+                            yield frame
             finally:
                 await ConversationMessage.objects.acreate(
                     conversation=conversation, role="human", content=message
@@ -216,10 +247,14 @@ class ProativoNaoLidasView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        total = ConversationMessage.objects.filter(
+        nao_lidas = ConversationMessage.objects.filter(
             conversation__user=request.user, is_proativa=True, lida_em__isnull=True
-        ).count()
-        return Response({"nao_lidas": total})
+        )
+        solicitacoes = list(
+            nao_lidas.exclude(solicitacao__isnull=True)
+            .values_list("solicitacao_id", flat=True).distinct()
+        )
+        return Response({"nao_lidas": nao_lidas.count(), "solicitacoes": solicitacoes})
 
 
 class ProativoMarcarLidasView(generics.GenericAPIView):
@@ -230,3 +265,23 @@ class ProativoMarcarLidasView(generics.GenericAPIView):
             conversation__user=request.user, is_proativa=True, lida_em__isnull=True
         ).update(lida_em=timezone.now())
         return Response({"marcadas": marcadas}, status=status.HTTP_200_OK)
+
+
+class ProativoAnalisesView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = SolicitacaoAnalise.objects.filter(usuario__user=request.user).select_related(
+            "commodity", "tipo_derivativo"
+        ).order_by("-criado_em")
+        busca = request.query_params.get("busca") or request.query_params.get("commodity")
+        if busca:
+            qs = qs.filter(commodity__nome__icontains=busca)
+        tipo = request.query_params.get("tipo")
+        if tipo:
+            qs = qs.filter(tipo_derivativo__nome__icontains=tipo)
+        status_q = request.query_params.get("status")
+        if status_q:
+            qs = qs.filter(status=status_q)
+        dados = SolicitacaoAnaliseReadSerializer(qs[:12], many=True).data
+        return Response({"analises": dados})

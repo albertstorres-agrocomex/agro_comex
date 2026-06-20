@@ -827,6 +827,60 @@ cd backend && python manage.py seed_agendamento
 
 Comando idempotente que cria (ou atualiza) registros `PeriodicTask` no `django-celery-beat` para as tres tasks de atualizacao de dados que servem como gatilho do sistema proativo. Execucao horaria.
 
+### Mauro proativo — Fase 2
+
+Adiciona a regra de alerta `melhor_momento`, a tool de listagem de analises do agente, o frame `cards` no stream e novos contratos nos endpoints proativos.
+
+#### Regra `melhor_momento` (`chatbot/proativo/regras.py`)
+
+Tres sinais de saida, com limiares default conservadores. Cada sinal e uma funcao pura que retorna `bool`:
+
+| Sinal | Funcao | Limiar default | Condicao |
+|-------|--------|----------------|----------|
+| Proximidade de knock-out | `proximo_knockout(spot_usd, barreira_usd, barreira_tipo, tolerancia=0.02)` | `tolerancia=0.02` | `barreira_tipo == "knock_out"` e `abs(spot_usd - barreira_usd) / barreira_usd <= tolerancia` |
+| Intrinseco relevante vs premio | `intrinseco_relevante(intrinseco_usd, premio_usd, fator=1.5)` | `fator=1.5` | `premio_usd > 0` e `intrinseco_usd >= fator * premio_usd` |
+| Proximidade do vencimento | `proximo_vencimento(dias_uteis, intrinseco_usd, limite=5)` | `limite=5` | `0 <= dias_uteis <= limite` e `intrinseco_usd > 0` |
+
+Funcao de apoio: `valor_intrinseco_usd(tipo_nome, spot_usd, strike_usd)` — `max(0.0, spot_usd - strike_usd)` para call, `max(0.0, strike_usd - spot_usd)` caso contrario.
+
+Os limiares (2% / 150% / 5 dias uteis) sao defaults; revisar com uso real e, se necessario, mover para configuracao.
+
+#### Template `melhor_momento` (`chatbot/proativo/templates.py`)
+
+`melhor_momento(analise, sinais, spot_usd) -> str`: monta o texto do alerta a partir do dicionario `_ROTULO_SINAL` (chaves `"knockout"`, `"intrinseco"`, `"vencimento"`), usando `analise.commodity.nome`, os motivos correspondentes aos sinais disparados e o `spot_usd` formatado com duas casas.
+
+#### Integracao na deteccao (`chatbot/proativo/deteccao.py`)
+
+`_avaliar_melhor_momento(analise)`: avalia os tres sinais em ordem (`proximo_knockout`, `intrinseco_relevante`, `proximo_vencimento`), acumula os rotulos `"knockout"`, `"intrinseco"`, `"vencimento"`. Estado `"disparado"` quando ha ao menos um sinal, `"normal"` caso contrario. `tipo_alerta` = `"melhor_momento"`. O anti-spam continua via `EstadoAlertaAnalise` (so emite na transicao de estado).
+
+#### Tool `listar_analises` (`chatbot/tool_listagem.py`)
+
+Factory `make_listagem_tool(django_user)` que retorna a tool `listar_analises(commodity="", tipo="", status="") -> str`. Filtra apenas as analises do `django_user` (limite `qs[:12]`) e retorna JSON:
+
+```json
+{"tipo": "cards", "payload": [{"id": 1, "commodity": "Soja", "tipo": "CALL", "status": "ativa"}]}
+```
+
+Registrada como sexta tool em `create_agent_executor` (`chatbot/agent.py`), via `make_listagem_tool(django_user)`.
+
+#### Frame `cards` no stream (`chatbot/views.py`)
+
+`ChatStreamView` consome `analise_id` do body por turno: se presente, vincula a `SolicitacaoAnalise` filtrada por `id=analise_id, usuario__user=request.user`; caso contrario usa `conversation.analise_id`.
+
+No `event_stream`, ao detectar `event["event"] == "on_tool_end"` com `name == "listar_analises"`, extrai `raw_output = event["data"].get("output")` e normaliza com `getattr(raw_output, "content", raw_output)` (trata variacao str vs objeto do `astream_events` v2). O resultado passa por `_frame_cards(output)`, que retorna `None` se nao for string ou JSON valido, ou se `dados.get("tipo") != "cards"`; caso valido, emite o frame SSE:
+
+```
+data: {"tipo": "cards", "payload": [...]}\n\n
+```
+
+#### Endpoints proativos (Fase 2)
+
+| Metodo | URL | Descricao |
+|--------|-----|-----------|
+| GET | `/api/v1/chat/proativo/analises/` | Lista analises do usuario para o `AnaliseCardPicker`. Query params: `busca` (com fallback para `commodity`), `tipo`, `status`. Limite fixo `qs[:12]`. Resposta `{"analises": [...]}` serializada por `SolicitacaoAnaliseReadSerializer` |
+
+O endpoint `GET /api/v1/chat/proativo/nao-lidas/` passa a incluir, alem de `nao_lidas`, o campo `solicitacoes` (lista de `solicitacao_id` distintos das mensagens proativas nao lidas): `{"nao_lidas": <count>, "solicitacoes": [<ids>]}`.
+
 ### Embedding e idempotencia (`embedding.py` + `tasks.py`)
 
 `build_embedding_content(analise) -> str`: constroi texto estruturado (tipo_derivativo, commodity, status, posicao, vencimento, data_criacao).

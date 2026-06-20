@@ -1,6 +1,6 @@
 "use client"
 
-export function TypingIndicator() {
+export function TypingIndicator({ label = "Mauro esta digitando" }: { label?: string } = {}) {
   return (
     <div className="flex gap-3 px-4 py-3 justify-start">
       <div
@@ -11,10 +11,10 @@ export function TypingIndicator() {
       </div>
       <div
         role="status"
-        aria-label="Mauro esta digitando"
+        aria-label={label}
         className="flex items-center gap-2 rounded-[var(--radius-lg)] bg-[var(--secondary)] px-4 py-2.5 text-sm text-[var(--secondary-foreground)]"
       >
-        <span className="text-[var(--muted-foreground)]">Mauro esta digitando</span>
+        <span className="text-[var(--muted-foreground)]">{label}</span>
         <span aria-hidden="true" className="flex gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
           <span className="h-1.5 w-1.5 rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
