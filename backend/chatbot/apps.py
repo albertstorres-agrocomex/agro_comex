@@ -7,3 +7,4 @@ class ChatbotConfig(AppConfig):
 
     def ready(self):
         import chatbot.signals  # noqa: F401
+        from chatbot.proativo import signals  # noqa: F401
