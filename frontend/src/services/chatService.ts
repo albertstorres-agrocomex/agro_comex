@@ -1,6 +1,6 @@
 import { apiFetch } from './authService'
 
-export type AnaliseCard = { id: number; commodity: string; tipo: string; status: string }
+export type AnaliseCard = { id: number; commodity_nome: string; tipo_derivativo_nome: string; status: string }
 
 export interface ConversationResponse {
   id: string
@@ -64,7 +64,17 @@ export async function streamMessage(
       }
       try {
         const dados = JSON.parse(payload)
-        if (dados.tipo === 'cards' && opts.onCards) opts.onCards(dados.payload)
+        if (dados.tipo === 'cards' && opts.onCards) {
+          type RawToolCard = { id: number; commodity: string; tipo: string; status: string }
+          opts.onCards(
+            (dados.payload as RawToolCard[]).map((p) => ({
+              id: p.id,
+              commodity_nome: p.commodity,
+              tipo_derivativo_nome: p.tipo,
+              status: p.status,
+            })),
+          )
+        }
         else if (dados.content) onChunk(dados.content)
       } catch { }
     }

@@ -16,8 +16,8 @@ export function AnaliseCardPicker({
       {analises.map((a) => (
         <button key={a.id} type="button" onClick={() => onSelecionar(a.id)} className="text-left">
           <Card className="cursor-pointer p-3 transition-colors hover:border-accent">
-            <p className="text-sm font-bold">{a.commodity}</p>
-            <p className="text-xs text-muted-foreground">{a.tipo}</p>
+            <p className="text-sm font-bold">{a.commodity_nome}</p>
+            <p className="text-xs text-muted-foreground">{a.tipo_derivativo_nome}</p>
             <p className="text-xs text-muted-foreground">{a.status}</p>
           </Card>
         </button>

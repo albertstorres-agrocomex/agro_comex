@@ -568,7 +568,7 @@ Servico HTTP do chatbot. Usa `apiFetch` com Bearer token automatico.
 - Body montado condicionalmente: inclui `analise_id` apenas se `analiseId !== undefined` e `client_hour` apenas se `clientHour !== undefined`
 - Retorna `greeting` (saudacao contextual gerada pelo backend) ou `null`
 
-**`type AnaliseCard = { id: number; commodity: string; tipo: string; status: string }`** — card de analise usado pelo picker e pelo frame `cards` do stream.
+**`type AnaliseCard = { id: number; commodity_nome: string; tipo_derivativo_nome: string; status: string }`** — card de analise alinhado ao `SolicitacaoAnaliseReadSerializer` do backend. O frame `cards` do stream SSE (tool `listar_analises`) envia `{id, commodity, tipo, status}` e e normalizado para este shape no frontend (`streamMessage`).
 
 **`streamMessage(conversationId, message, onChunk, onDone, opts): Promise<void>`** — `opts: { analiseId?: number; onCards?: (cards: AnaliseCard[]) => void } = {}`
 - `POST /api/v1/chat/stream/` com `{ conversation_id, message }` (inclui `analise_id` quando `opts.analiseId` definido)
@@ -699,7 +699,7 @@ Grade de cards para o usuario escolher a analise a discutir antes de iniciar a c
 Props: `analises: AnaliseCard[]`, `onSelecionar: (id: number) => void`
 
 - Retorna `null` quando `analises.length === 0`
-- Grade `grid grid-cols-2 gap-2 sm:grid-cols-3`; cada item e um `<button>` envolvendo um `<Card>` com `commodity` (negrito), `tipo` e `status` (mutados)
+- Grade `grid grid-cols-2 gap-2 sm:grid-cols-3`; cada item e um `<button>` envolvendo um `<Card>` com `commodity_nome` (negrito), `tipo_derivativo_nome` e `status` (mutados)
 - Clique chama `onSelecionar(a.id)`
 
 ---
