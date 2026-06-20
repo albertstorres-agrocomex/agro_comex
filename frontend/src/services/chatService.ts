@@ -64,3 +64,39 @@ export async function streamMessage(
   }
   onDone()
 }
+
+export type ProativoMessage = {
+  id: string
+  role: 'human' | 'ai'
+  content: string
+  created_at: string
+  is_proativa: boolean
+  lida_em: string | null
+  tipo_alerta: string | null
+  solicitacao: number | null
+}
+
+export async function getProativoNaoLidas(): Promise<{ nao_lidas: number }> {
+  const res = await apiFetch('/api/v1/chat/proativo/nao-lidas/', {
+    method: 'GET',
+  })
+  if (!res.ok) throw { status: res.status }
+  return res.json()
+}
+
+export async function getProativoConversa(): Promise<{
+  conversation_id: string
+  messages: ProativoMessage[]
+}> {
+  const res = await apiFetch('/api/v1/chat/proativo/', { method: 'GET' })
+  if (!res.ok) throw { status: res.status }
+  return res.json()
+}
+
+export async function marcarProativoLidas(): Promise<{ marcadas: number }> {
+  const res = await apiFetch('/api/v1/chat/proativo/marcar-lidas/', {
+    method: 'POST',
+  })
+  if (!res.ok) throw { status: res.status }
+  return res.json()
+}
