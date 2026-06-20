@@ -1,10 +1,14 @@
 # backend/chatbot/proativo/deteccao.py
+import logging
+
 from celery import shared_task
 
 from analises.models import SolicitacaoAnalise
 from dados.servicos import obter_cotacao_cache
 from chatbot.models import Conversation, ConversationMessage, EstadoAlertaAnalise
 from chatbot.proativo import regras, templates
+
+logger = logging.getLogger(__name__)
 
 STATUS_ATIVOS = ["concluido", "aprovado"]
 
@@ -65,7 +69,10 @@ def varrer_alertas_proativos():
     )
     total = 0
     for analise in qs:
-        _avaliar_cenario(analise)
-        _avaliar_strike(analise)
-        total += 1
+        try:
+            _avaliar_cenario(analise)
+            _avaliar_strike(analise)
+            total += 1
+        except Exception:
+            logger.exception("falha ao avaliar analise proativa %s", analise.id)
     return {"analises_avaliadas": total}

@@ -42,6 +42,28 @@ class DeteccaoTest(TestCase):
             ConversationMessage.objects.filter(tipo_alerta="cenario_nao_escolhido").count(), 1
         )
 
+    @patch("chatbot.proativo.deteccao.obter_cotacao_cache", return_value=None)
+    def test_falha_em_uma_analise_nao_aborta_as_demais(self, _cot):
+        a1 = _analise()
+        a2 = _analise()
+
+        original = deteccao._avaliar_cenario
+
+        def cenario_com_falha(analise):
+            if analise.id == a1.id:
+                raise RuntimeError("erro simulado")
+            return original(analise)
+
+        with patch("chatbot.proativo.deteccao._avaliar_cenario", side_effect=cenario_com_falha):
+            resultado = deteccao.varrer_alertas_proativos()
+
+        self.assertEqual(resultado["analises_avaliadas"], 1)
+        msgs = ConversationMessage.objects.filter(
+            is_proativa=True, tipo_alerta="cenario_nao_escolhido",
+            solicitacao=a2,
+        )
+        self.assertEqual(msgs.count(), 1)
+
     def test_cotacao_alerta_apenas_na_transicao(self):
         analise = _analise(preco_exercicio=4600)  # strike 46.00
         # 1a varredura: spot 45 (abaixo) -> registra estado, sem alerta
