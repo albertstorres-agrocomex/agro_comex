@@ -1,5 +1,7 @@
 import { apiFetch } from './authService'
 
+export type AnaliseCard = { id: number; commodity: string; tipo: string; status: string }
+
 export interface ConversationResponse {
   id: string
   created_at: string
@@ -27,11 +29,15 @@ export async function streamMessage(
   message: string,
   onChunk: (content: string) => void,
   onDone: () => void,
+  opts: { analiseId?: number; onCards?: (cards: AnaliseCard[]) => void } = {},
 ): Promise<void> {
+  const body: Record<string, unknown> = { conversation_id: conversationId, message }
+  if (opts.analiseId) body.analise_id = opts.analiseId
+
   const res = await apiFetch('/api/v1/chat/stream/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ conversation_id: conversationId, message }),
+    body: JSON.stringify(body),
   })
 
   if (!res.ok) throw { status: res.status }
@@ -57,8 +63,9 @@ export async function streamMessage(
         return
       }
       try {
-        const { content } = JSON.parse(payload)
-        if (content) onChunk(content)
+        const dados = JSON.parse(payload)
+        if (dados.tipo === 'cards' && opts.onCards) opts.onCards(dados.payload)
+        else if (dados.content) onChunk(dados.content)
       } catch { }
     }
   }
@@ -76,10 +83,20 @@ export type ProativoMessage = {
   solicitacao: number | null
 }
 
-export async function getProativoNaoLidas(): Promise<{ nao_lidas: number }> {
+export async function getProativoNaoLidas(): Promise<{ nao_lidas: number; solicitacoes: number[] }> {
   const res = await apiFetch('/api/v1/chat/proativo/nao-lidas/', {
     method: 'GET',
   })
+  if (!res.ok) throw { status: res.status }
+  return res.json()
+}
+
+export async function getProativoAnalises(
+  filtro: { commodity?: string; tipo?: string; status?: string } = {},
+): Promise<{ analises: AnaliseCard[] }> {
+  const params = new URLSearchParams(filtro as Record<string, string>).toString()
+  const url = `/api/v1/chat/proativo/analises/${params ? `?${params}` : ''}`
+  const res = await apiFetch(url, { method: 'GET' })
   if (!res.ok) throw { status: res.status }
   return res.json()
 }
