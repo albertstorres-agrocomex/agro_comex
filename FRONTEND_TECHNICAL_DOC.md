@@ -70,6 +70,8 @@ frontend/src/
         page.tsx             # Detalhe de analise — exibe campos, resultado Black-Scholes, cenarios (conservador/moderado/agressivo/proposto) com curva de payoff; cenario proposto destacado com posicionamento e cor dinamicos; acoes aprovar/reprovar (so para concluido); botao "Discutir no chat" navega para /chat?analise_id={id}
     chat/
       page.tsx               # Mauro — ChatPage (Suspense wrapper) + ChatPageInner (le analise_id via useSearchParams); exibe contexto da analise quando presente; requer autenticacao
+    messages/
+      page.tsx               # Mensagens proativas do Mauro — exibe thread proativa, marca lidas no mount, reply via streamMessage
     login/
       page.tsx               # Redirect para `/`
     styleguide/
@@ -141,6 +143,7 @@ frontend/src/
 | `/analises` | Lista paginada de analises — requer autenticacao |
 | `/analises/[id]` | Detalhe de analise — acoes de aprovacao/reprovacao; botao "Discutir no chat" |
 | `/chat` | Mauro (assistente IA) — aceita `?analise_id={id}` como contexto opcional; saudacao contextual no mount |
+| `/messages` | Mensagens proativas do Mauro — thread de alertas; marca lidas no mount; reply via streamMessage |
 | `/styleguide` | Design tokens — cores, tipografia, radii |
 | `/styleguide/components/bar-chart` | Showcase do BarChartComex |
 | `/styleguide/components/line-chart` | Showcase do LineChartComex |
@@ -571,6 +574,20 @@ Servico HTTP do chatbot. Usa `apiFetch` com Bearer token automatico.
 - Buffer acumula chunks, divide por `\n`, processa linhas `data: ...`
 - Chama `onChunk(content)` a cada chunk JSON valido; `onDone()` ao receber `[DONE]`
 
+**`interface ProativoMessage`** — tipo para mensagens proativas: `id`, `content`, `created_at`, `tipo_alerta`, `lida_em`, `solicitacao`.
+
+**`getProativoNaoLidas(): Promise<{ nao_lidas: number }>`**
+- `GET /api/v1/chat/proativo/nao-lidas/`
+- Retorna contagem de mensagens proativas nao lidas
+
+**`getProativoConversa(): Promise<{ conversation_id, messages: ProativoMessage[] }>`**
+- `GET /api/v1/chat/proativo/`
+- Retorna ID da conversa proativa e lista de mensagens
+
+**`marcarProativoLidas(): Promise<{ marcadas: number }>`**
+- `POST /api/v1/chat/proativo/marcar-lidas/`
+- Marca todas as mensagens proativas como lidas
+
 ---
 
 ### ChatMessage
@@ -633,6 +650,28 @@ Refs: `bottomRef` (auto-scroll) e `streamActiveRef` (guard de race condition)
 
 Adicionado ao array `DEFAULT_NAV_ITEMS` em `Sidebar.tsx`:
 - Label: `"Mauro"`, href: `"/chat"`, icon: `Bot` (lucide-react)
+
+---
+
+### TopMenu — badge de nao-lidas proativas
+
+**Componente:** `NaoLidasBadge` (em `TopMenu.tsx`)
+
+Badge numerico exibido junto ao item "Mensagens" no menu superior (desktop e mobile). Usa o token `--accent` (green) como cor de fundo. Visivel apenas quando ha mensagens nao lidas (`nao_lidas > 0`).
+
+**Hook:** `useProativoNaoLidas` — polling a cada 45 segundos via `getProativoNaoLidas()`. Retorna a contagem atual de mensagens proativas nao lidas.
+
+---
+
+### Pagina /messages
+
+**Arquivo:** `src/app/messages/page.tsx`
+
+Pagina dedicada ao thread de mensagens proativas do Mauro. Requer autenticacao.
+
+- No mount, chama `getProativoConversa()` para carregar a thread e `marcarProativoLidas()` para zerar o badge
+- Mensagens proativas destacadas visualmente com o token `--accent`
+- O usuario pode responder via `streamMessage` existente, usando o `conversation_id` da conversa proativa
 
 ---
 

@@ -602,11 +602,11 @@ Variavel de ambiente obrigatoria: `OPENAI_API_KEY` (carregada via `python-decoup
 ```
 backend/chatbot/
   __init__.py
-  apps.py               # registra signals no ready()
-  models.py             # Conversation, ConversationMessage, AnaliseEmbedding
+  apps.py               # registra signals no ready() (embedding + proativo)
+  models.py             # Conversation, ConversationMessage, AnaliseEmbedding, EstadoAlertaAnalise
   admin.py              # ConversationAdmin com MessageInline
-  serializers.py        # ConversationSerializer
-  views.py              # ConversationCreateView, ChatStreamView (async SSE)
+  serializers.py        # ConversationSerializer, ProativoMessageSerializer
+  views.py              # ConversationCreateView, ChatStreamView (async SSE), ProativoViews
   urls.py
   tool_db.py            # Tool 1: consultar_analises (ORM + filtros por keyword)
   tool_rag.py           # Tool 2: busca_semantica (pgvector coseno top-5)
@@ -617,9 +617,16 @@ backend/chatbot/
   embedding.py          # build_embedding_content, compute_content_hash (SHA-256)
   tasks.py              # reembedar_analise (Celery, idempotente via content_hash)
   signals.py            # post_save SolicitacaoAnalise -> reembedar_analise.delay
+  proativo/
+    __init__.py
+    regras.py            # estado_cenario, estado_strike, tem_cenario_escolhido
+    templates.py         # cenario_nao_escolhido, cotacao_cruzou (message builders)
+    deteccao.py          # @shared_task varrer_alertas_proativos (varredura por analise)
+    signals.py           # task_success handler disparar_varredura (encadeia apos tasks de dados)
   migrations/
     0001_initial.py
     0002_analise_embedding.py   # extensao vector + indice HNSW cosine
+    0004_proativo.py            # is_proativa, lida_em, solicitacao, tipo_alerta, EstadoAlertaAnalise
   tests/
     test_models.py
     test_views.py
@@ -634,6 +641,7 @@ backend/chatbot/
 - `id`: UUIDField (PK, default=uuid4)
 - `user`: ForeignKey para `settings.AUTH_USER_MODEL` (CASCADE)
 - `analise`: ForeignKey para `analises.SolicitacaoAnalise` (SET_NULL, null=True, blank=True, related_name="conversations") — vincula a conversa a uma analise especifica; SET_NULL preserva o historico de chat ao deletar a analise (migration `0003_conversation_analise`)
+- `is_proativa`: BooleanField (default=False) — marca a conversa como proativa (uma por usuario); migration `0004`
 - `created_at`: DateTimeField (auto_now_add)
 - `db_table = "chatbot_conversations"`, ordering por `-created_at`
 
@@ -641,8 +649,22 @@ backend/chatbot/
 - `conversation`: ForeignKey para `Conversation` (CASCADE, related_name="messages")
 - `role`: CharField choices `[("human", "Human"), ("ai", "AI")]`
 - `content`: TextField
+- `is_proativa`: BooleanField (default=False) — identifica mensagens geradas pelo sistema proativo; migration `0004`
+- `lida_em`: DateTimeField (null=True, blank=True) — timestamp de leitura pelo usuario; migration `0004`
+- `solicitacao`: ForeignKey para `analises.SolicitacaoAnalise` (SET_NULL, null=True, blank=True) — analise que originou o alerta; migration `0004`
+- `tipo_alerta`: CharField (max_length=30, blank=True, default="") — tipo do alerta proativo; choices definidos em `TIPO_ALERTA_CHOICES`; migration `0004`
 - `created_at`: DateTimeField (auto_now_add)
 - `db_table = "chatbot_messages"`, ordering por `created_at`
+
+**`EstadoAlertaAnalise`** (migration `0004`)
+- `solicitacao`: ForeignKey para `analises.SolicitacaoAnalise` (CASCADE)
+- `tipo_alerta`: CharField (max_length=30, choices=`TIPO_ALERTA_CHOICES`)
+- `ultimo_estado`: TextField — ultimo estado detectado para anti-spam (evita reenvio do mesmo alerta)
+- `atualizado_em`: DateTimeField (auto_now)
+- `unique_together = ("solicitacao", "tipo_alerta")`
+- `db_table = "chatbot_estado_alerta_analise"`
+
+Constante `TIPO_ALERTA_CHOICES`: `cenario_nao_escolhido`, `cotacao_cruzou`, `melhor_momento`.
 
 **`AnaliseEmbedding`**
 - `analise`: OneToOneField para `analises.SolicitacaoAnalise` (CASCADE, related_name="embedding")
@@ -766,7 +788,42 @@ Seguranca: posse re-checada server-side via queryset (A01); nenhuma URL e contro
 - Sem dado, informa indisponibilidade ("No momento nao tenho a cotacao do dolar (USD/BRL) disponivel") — nunca inventa o cambio.
 - Usada apenas quando o usuario pede explicitamente o valor em reais. Strike, preco de mercado e cotacao ja estao em USD: a comparacao de vantagem do contrato e feita em USD, sem conversao.
 
-Fora de escopo (registrado no prompt e nesta doc): Black-Scholes call/put com barreira (orientacao de saida com barreira nao suportada — ver SR2); aba "Mensagens" do Mauro proativo / multi-analise.
+Fora de escopo (registrado no prompt e nesta doc): Black-Scholes call/put com barreira (orientacao de saida com barreira nao suportada — ver SR2).
+
+### Mauro proativo — Fase 1
+
+Sistema de alertas proativos que detecta mudancas relevantes nas analises do usuario e emite mensagens automaticas na conversa proativa.
+
+#### Pacote `chatbot/proativo/`
+
+| Modulo | Descricao |
+|--------|-----------|
+| `regras.py` | Funcoes de estado: `estado_cenario(solicitacao)` (retorna estado de escolha de cenario), `estado_strike(solicitacao)` (compara spot USD vs preco_exercicio/100), `tem_cenario_escolhido(solicitacao)` (bool) |
+| `templates.py` | Construtores de mensagem: `cenario_nao_escolhido(solicitacao)`, `cotacao_cruzou(solicitacao)` — retornam o texto do alerta proativo |
+| `deteccao.py` | `@shared_task varrer_alertas_proativos` — varre todas as analises ativas, detecta transicoes de estado por tipo de alerta, usa `EstadoAlertaAnalise` como anti-spam (so emite se o estado mudou), cria `ConversationMessage` na conversa proativa do usuario |
+| `signals.py` | Handler `disparar_varredura` conectado ao signal `task_success` do Celery — dispara `varrer_alertas_proativos.delay()` apenas quando a task concluida esta em `_TASKS_GATILHO` (tasks de atualizacao de dados de mercado) |
+
+O `apps.py` importa `chatbot.proativo.signals` no `ready()` para registrar o handler.
+
+#### Endpoints proativos
+
+Todos requerem `IsAuthenticated` e operam exclusivamente sobre dados do `request.user`.
+
+| Metodo | URL | Descricao |
+|--------|-----|-----------|
+| GET | `/api/v1/chat/proativo/` | Retorna `conversation_id` e lista de mensagens da conversa proativa do usuario |
+| GET | `/api/v1/chat/proativo/nao-lidas/` | Retorna contagem de mensagens proativas nao lidas (`nao_lidas`) |
+| POST | `/api/v1/chat/proativo/marcar-lidas/` | Marca todas as mensagens proativas como lidas (preenche `lida_em`); retorna `marcadas` |
+
+**Serializer:** `ProativoMessageSerializer` (read-only) — serializa mensagens proativas com `id`, `content`, `created_at`, `tipo_alerta`, `lida_em`, `solicitacao`.
+
+#### Management command `seed_agendamento`
+
+```bash
+cd backend && python manage.py seed_agendamento
+```
+
+Comando idempotente que cria (ou atualiza) registros `PeriodicTask` no `django-celery-beat` para as tres tasks de atualizacao de dados que servem como gatilho do sistema proativo. Execucao horaria.
 
 ### Embedding e idempotencia (`embedding.py` + `tasks.py`)
 
