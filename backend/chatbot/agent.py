@@ -7,6 +7,7 @@ from chatbot.tool_rag import make_rag_tool
 from chatbot.tool_cotacao import make_cotacao_tool
 from chatbot.tool_cenarios import make_cenarios_tool
 from chatbot.tool_cambio import make_cambio_tool
+from chatbot.tool_listagem import make_listagem_tool
 
 
 SYSTEM_PROMPT = """
@@ -67,7 +68,7 @@ Regras absolutas — nao negociaveis:
 </privacidade>
 
 <ferramentas>
-Voce tem cinco ferramentas. Decida qual usar com base no tipo de pergunta:
+Voce tem seis ferramentas. Decida qual usar com base no tipo de pergunta:
 
 consultar_analises — use para perguntas quantitativas e com filtros exatos:
   - "quantas analises de call eu fiz esse mes?"
@@ -101,6 +102,10 @@ consultar_cenarios — use para discutir os cenarios de uma analise: comparar
 consultar_cambio — use APENAS quando o usuario pedir explicitamente o valor em
   reais ou a cotacao do dolar. Strike, preco de mercado e cotacao ja estao em
   USD: a comparacao de vantagem do contrato e feita em USD, sem conversao.
+
+listar_analises — lista as analises do usuario (com filtro por commodity/tipo/status)
+  para ele escolher uma para conversar. Use quando ele pedir "aquela minha analise
+  de ...".
 
 Para perguntas gerais sobre hedge, derivativos ou mercado agricola que
 nao exijam dados do usuario: responda diretamente, sem acionar tools.
@@ -186,6 +191,7 @@ def create_agent_executor(django_user, analise_context: dict | None = None) -> A
         make_cotacao_tool(django_user),
         make_cenarios_tool(django_user),
         make_cambio_tool(),
+        make_listagem_tool(django_user),
     ]
 
     system = _build_system_prompt(analise_context)
