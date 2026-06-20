@@ -1,11 +1,12 @@
 import json
 from django.http import StreamingHttpResponse, HttpResponse
+from django.utils import timezone
 from langchain_core.messages import HumanMessage, AIMessage
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from chatbot.models import Conversation, ConversationMessage
-from chatbot.serializers import ConversationSerializer
+from chatbot.serializers import ConversationSerializer, ProativoMessageSerializer
 from chatbot.agent import create_agent_executor
 from analises.models import SolicitacaoAnalise
 
@@ -192,3 +193,40 @@ class ChatStreamView(generics.GenericAPIView):
             content_type="text/event-stream",
             headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
         )
+
+
+def _conversa_proativa_do_usuario(user):
+    conversa, _ = Conversation.objects.get_or_create(user=user, is_proativa=True)
+    return conversa
+
+
+class ProativoConversaView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        conversa = _conversa_proativa_do_usuario(request.user)
+        mensagens = conversa.messages.all()
+        return Response({
+            "conversation_id": str(conversa.id),
+            "messages": ProativoMessageSerializer(mensagens, many=True).data,
+        })
+
+
+class ProativoNaoLidasView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        total = ConversationMessage.objects.filter(
+            conversation__user=request.user, is_proativa=True, lida_em__isnull=True
+        ).count()
+        return Response({"nao_lidas": total})
+
+
+class ProativoMarcarLidasView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        marcadas = ConversationMessage.objects.filter(
+            conversation__user=request.user, is_proativa=True, lida_em__isnull=True
+        ).update(lida_em=timezone.now())
+        return Response({"marcadas": marcadas}, status=status.HTTP_200_OK)
