@@ -98,6 +98,12 @@ Plataforma de inteligencia para o agronegocio com foco em comercio exterior, int
   - Frontend: servico proativo em `chatService.ts` (`getProativoNaoLidas`, `getProativoConversa`, `marcarProativoLidas`)
   - Frontend: badge de nao-lidas no TopMenu (hook `useProativoNaoLidas` com polling 45s, token `--accent`)
   - Frontend: rota `/messages` com thread proativa, marcacao de lidas no mount, reply via streamMessage
+- [x] Mauro proativo — Fase 2 (`/messages`): alerta de saida, selecao de analise por cards e permissao mid-conversa
+  - Backend: regra `melhor_momento` (`tipo_alerta="melhor_momento"`) com tres sinais de saida — proximidade de knock-out (tolerancia 2%), intrinseco relevante vs premio (fator 1.5x) e proximidade do vencimento (5 dias uteis); limiares conservadores em `chatbot/proativo/regras.py`
+  - Backend: tool `listar_analises` do agente (`chatbot/tool_listagem.py`) que devolve cards filtrados por commodity/tipo/status (limite 12)
+  - Backend: frame `cards` no stream (`on_tool_end` de `listar_analises` em `ChatStreamView`) e `analise_id` por turno
+  - Backend: endpoint `GET /api/v1/chat/proativo/analises/` (params `busca`/`commodity`/`tipo`/`status`) e campo `solicitacoes` na resposta de `/nao-lidas/`
+  - Frontend: `AnaliseCardPicker` (selecao de analise antes da conversa), filtro em linguagem natural via tool de listagem, `analiseId` no `streamMessage`, label "conferindo atualizacao..." no `TypingIndicator` e prompt de permissao mid-conversa em `/messages`
 
 ### Infraestrutura
 
@@ -124,7 +130,3 @@ Plataforma de inteligencia para o agronegocio com foco em comercio exterior, int
   BACKEND_TECHNICAL_DOC.md, secao Forward/Swap). Forward seguiria o modelo de carrego
   calibrado do futuro B3; Swap, VPL multi-periodo sobre a curva de forwards. CALL,
   PUT e opcoes com barreira permanecem em producao.
-- **Mauro proativo — Fase 2:** regra `melhor_momento` (4 sinais de saida: proximidade
-  de knock-out, intrinseco vs premio, proximidade do vencimento, spot cruzou strike;
-  limiares conservadores); `AnaliseCardPicker` com filtro em linguagem natural (tool
-  de listagem do agente); fluxo de permissao mid-conversa ("conferindo atualizacao...").
