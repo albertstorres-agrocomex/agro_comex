@@ -9,6 +9,7 @@ from chatbot.models import Conversation, ConversationMessage
 from chatbot.serializers import ConversationSerializer, ProativoMessageSerializer
 from chatbot.agent import create_agent_executor
 from analises.models import SolicitacaoAnalise
+from analises.serializers import SolicitacaoAnaliseReadSerializer
 
 
 def _get_saudacao(hour: int) -> str:
@@ -230,3 +231,23 @@ class ProativoMarcarLidasView(generics.GenericAPIView):
             conversation__user=request.user, is_proativa=True, lida_em__isnull=True
         ).update(lida_em=timezone.now())
         return Response({"marcadas": marcadas}, status=status.HTTP_200_OK)
+
+
+class ProativoAnalisesView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = SolicitacaoAnalise.objects.filter(usuario__user=request.user).select_related(
+            "commodity", "tipo_derivativo"
+        ).order_by("-criado_em")
+        busca = request.query_params.get("busca") or request.query_params.get("commodity")
+        if busca:
+            qs = qs.filter(commodity__nome__icontains=busca)
+        tipo = request.query_params.get("tipo")
+        if tipo:
+            qs = qs.filter(tipo_derivativo__nome__icontains=tipo)
+        status_q = request.query_params.get("status")
+        if status_q:
+            qs = qs.filter(status=status_q)
+        dados = SolicitacaoAnaliseReadSerializer(qs[:12], many=True).data
+        return Response({"analises": dados})
