@@ -574,7 +574,7 @@ Servico HTTP do chatbot. Usa `apiFetch` com Bearer token automatico.
 - Buffer acumula chunks, divide por `\n`, processa linhas `data: ...`
 - Chama `onChunk(content)` a cada chunk JSON valido; `onDone()` ao receber `[DONE]`
 
-**`interface ProativoMessage`** — tipo para mensagens proativas: `id`, `content`, `created_at`, `tipo_alerta`, `lida_em`, `solicitacao`.
+**`interface ProativoMessage`** — tipo para mensagens proativas: `id`, `role`, `content`, `created_at`, `is_proativa`, `tipo_alerta`, `lida_em`, `solicitacao`.
 
 **`getProativoNaoLidas(): Promise<{ nao_lidas: number }>`**
 - `GET /api/v1/chat/proativo/nao-lidas/`

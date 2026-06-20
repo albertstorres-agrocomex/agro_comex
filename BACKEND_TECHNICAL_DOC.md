@@ -652,7 +652,7 @@ backend/chatbot/
 - `is_proativa`: BooleanField (default=False) — identifica mensagens geradas pelo sistema proativo; migration `0004`
 - `lida_em`: DateTimeField (null=True, blank=True) — timestamp de leitura pelo usuario; migration `0004`
 - `solicitacao`: ForeignKey para `analises.SolicitacaoAnalise` (SET_NULL, null=True, blank=True) — analise que originou o alerta; migration `0004`
-- `tipo_alerta`: CharField (max_length=30, blank=True, default="") — tipo do alerta proativo; choices definidos em `TIPO_ALERTA_CHOICES`; migration `0004`
+- `tipo_alerta`: CharField (max_length=30, choices=TIPO_ALERTA_CHOICES, null=True, blank=True) — tipo do alerta proativo; migration `0004`
 - `created_at`: DateTimeField (auto_now_add)
 - `db_table = "chatbot_messages"`, ordering por `created_at`
 
@@ -817,7 +817,9 @@ Todos requerem `IsAuthenticated` e operam exclusivamente sobre dados do `request
 
 **Serializer:** `ProativoMessageSerializer` (read-only) — serializa mensagens proativas com `id`, `content`, `created_at`, `tipo_alerta`, `lida_em`, `solicitacao`.
 
-#### Management command `seed_agendamento`
+#### Management command `seed_agendamento` (app `dados`)
+
+**Arquivo:** `backend/dados/management/commands/seed_agendamento.py`
 
 ```bash
 cd backend && python manage.py seed_agendamento
