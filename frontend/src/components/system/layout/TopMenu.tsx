@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NavItem } from "./Sidebar"
+import { NaoLidasBadge } from "./NaoLidasBadge"
 
 // ---------------------------------------------------------------------------
 // Default navigation — mirrors Sidebar
@@ -123,6 +124,7 @@ export function TopMenu({
                     aria-hidden="true"
                   />
                   {item.label}
+                  {item.href === "/messages" && <NaoLidasBadge />}
                 </Link>
               </li>
             )
@@ -183,6 +185,7 @@ export function TopMenu({
                   aria-hidden="true"
                 />
                 {item.label}
+                {item.href === "/messages" && <NaoLidasBadge />}
               </Link>
             )
           })}
