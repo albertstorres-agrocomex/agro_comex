@@ -75,7 +75,7 @@ def _avaliar_melhor_momento(analise):
     if analise.nivel_barreira and regras.proximo_knockout(spot, analise.nivel_barreira / 100, analise.barreira_tipo or ""):
         sinais.append("knockout")
     resultado = ResultadoAnalise.objects.filter(solicitacao=analise).order_by("-calculado_em").first()
-    if resultado and regras.intrinseco_relevante(intrinseco, resultado.premio_calculado / 100):
+    if resultado and resultado.premio_calculado and regras.intrinseco_relevante(intrinseco, resultado.premio_calculado / 100):
         sinais.append("intrinseco")
     if analise.mes_contrato_id and analise.mes_contrato.data_vencimento:
         dias = regras.dias_uteis_ate(analise.mes_contrato.data_vencimento, dt.date.today())
