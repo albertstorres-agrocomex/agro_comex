@@ -4,7 +4,7 @@
 
 - **Diretório:** `backend/`
 - **Deploy:** Render
-- **URL produção:** —
+- **URL produção:** https://agro-comex.onrender.com
 
 ## Stack
 

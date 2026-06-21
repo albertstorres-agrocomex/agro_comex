@@ -2,7 +2,7 @@
 
 ## Visao Geral
 
-Plataforma de inteligencia para o agronegocio com foco em comercio exterior, integrando dados de mercado, ML federado e analise de risco de derivativos agricolas.
+Plataforma de inteligencia para o agronegocio com foco em comercio exterior, integrando dados de mercado e analise de risco de derivativos agricolas.
 
 ## Repositorio
 
@@ -26,8 +26,8 @@ Plataforma de inteligencia para o agronegocio com foco em comercio exterior, int
 | Ambiente | URL |
 |---|---|
 | Landing Page (producao) | https://agro-comex-landing.vercel.app |
-| Frontend (producao) | — |
-| Backend (API) | — |
+| Frontend (producao) | https://agro-comex-git-hml-torres-projects-3f0de638.vercel.app |
+| Backend (API) | https://agro-comex.onrender.com |
 
 ---
 
@@ -116,21 +116,32 @@ Plataforma de inteligencia para o agronegocio com foco em comercio exterior, int
 
 - [x] Repositorio GitHub criado
 - [x] Landing page deployada no Vercel
+- [x] Frontend deployado no Vercel (producao)
+- [x] Backend deployado no Render (API REST) (producao)
+- [x] Banco de dados de producao no Neon (serverless PostgreSQL, projeto `agro-comex-prod`)
+- [x] Redis no Render (broker/result backend do Celery) — service `red-d8pk9vnlk1mc73eff6l0`
+- [x] Worker e Beat do Celery no Render — service `srv-d8plgrbtqb8s738a576g` (mesma instancia)
 
 ---
 
 ## Proximos Passos
 
-- [ ] Frontend configurado e deployado no Vercel
-- [ ] Backend configurado e deployado no Render
+- [x] Frontend configurado e deployado no Vercel
+- [x] Backend configurado e deployado no Render
 - [ ] Configuracao de permissoes nos ViewSets restantes (`permission_classes` globais)
 - [ ] Adicionar origin de producao em `CORS_ALLOWED_ORIGINS`
 - [ ] Implementacao dos modulos MVP: ComexMap, PriceStory, AgroChat
-- [ ] Implementacao do modulo FedPredict (ML federado)
 - [ ] Corracao de typos nos nomes de modelos Django (Comomodity, MesContratoFurturo)
 - [ ] Expandir cobertura de testes (atualmente apenas validacao de campos em SolicitacaoAnalise)
 
 ### Fora de escopo — melhorias futuras
+
+- **ML para predicao de volatilidade:** modelo de aprendizado de maquina para estimar
+  uma volatilidade futura mais proxima da realidade de mercado, substituindo a
+  volatilidade historica (252 pregoes) hoje usada na precificacao Black-Scholes. A
+  abordagem de ML federado foi avaliada e descartada ao final do SR1; o caminho
+  adotado e um modelo supervisionado de predicao de volatilidade (ver
+  `project_ml_volatilidade`). Pendente de maior volume de dados historicos.
 
 - **Forward e Swap:** removidos da selecao de nova analise em 2026-06-19. Dependem
   de uma camada de curva de futuros por vencimento ainda inexistente (ver

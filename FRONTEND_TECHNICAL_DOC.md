@@ -28,7 +28,7 @@ npx vercel --prod
 
 - **Diretorio:** `frontend/`
 - **Deploy:** Vercel
-- **URL producao:** —
+- **URL producao:** https://agro-comex-git-hml-torres-projects-3f0de638.vercel.app
 
 ---
 
@@ -375,7 +375,6 @@ Acessivel em `/styleguide`. Serve como fonte de verdade visual e documentacao in
 | Componentes | LineChart | `/styleguide/components/line-chart` | — |
 | Componentes | PieChart | `/styleguide/components/pie-chart` | — |
 | Componentes | WorldMap | `/styleguide/components/world-map` | — |
-| Core Tecnico | FedPredict | `/styleguide/components/fedpredict` | FL |
 
 ### Pagina de Design Tokens (`/styleguide`)
 

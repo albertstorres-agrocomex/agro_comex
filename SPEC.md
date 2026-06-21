@@ -13,11 +13,15 @@ agro_comex/
 
 ## Deploys
 
+Todos os deploys previstos para producao estao concluidos.
+
 | Projeto | Plataforma | Branch producao | Branch staging |
 |---|---|---|---|
 | landing_page | Vercel | `main` | `hml` |
 | frontend | Vercel | `main` | `hml` |
 | backend | Render | `main` | `hml` |
+| Redis (broker/result Celery) | Render | service `red-d8pk9vnlk1mc73eff6l0` | — |
+| Celery worker + beat | Render | service `srv-d8plgrbtqb8s738a576g` (mesma instancia) | — |
 | banco de dados | Neon (serverless PostgreSQL) | projeto `agro-comex-prod` | — |
 
 ### Configuracao do banco de producao (Neon)
@@ -30,8 +34,8 @@ agro_comex/
 ## URLs
 
 - Landing Page: https://agro-comex-landing.vercel.app
-- Frontend: —
-- Backend API: —
+- Frontend: https://agro-comex-git-hml-torres-projects-3f0de638.vercel.app
+- Backend API: https://agro-comex.onrender.com
 
 ---
 
@@ -182,6 +186,13 @@ Regras adicionais para opcoes com barreira (`requer_barreira=True`), validadas n
 | d1 | DecimalField(12,6) (null) | Parametro d1 da formula Black-Scholes |
 | d2 | DecimalField(12,6) (null) | Parametro d2 da formula Black-Scholes |
 | calculado_em | DateTimeField | auto_now_add |
+
+> **Melhoria futura — ML de volatilidade:** `volatilidade_utilizada` hoje usa a
+> volatilidade historica anualizada (252 pregoes). Esta previsto um modelo de
+> aprendizado de maquina para estimar uma volatilidade futura mais proxima da
+> realidade de mercado, alimentando a precificacao Black-Scholes. A abordagem de
+> ML federado foi descartada ao final do SR1; o caminho atual e um modelo
+> supervisionado de predicao de volatilidade, pendente de maior volume de dados.
 
 #### `analises.CenarioAnalise`
 | Campo | Tipo | Obs |

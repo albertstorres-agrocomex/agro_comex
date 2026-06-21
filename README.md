@@ -25,7 +25,7 @@ Plataforma de inteligencia de mercado para o agronegocio brasileiro. Consolida d
 
 ## Funcionalidades
 
-- **Precificacao de derivativos (Black-Scholes):** calcula o premio de opcoes (call/put) usando volatilidade historica (252 pregoes) e taxa SELIC, persistindo d1, d2 e o valor total do contrato para auditoria.
+- **Precificacao de derivativos (Black-Scholes):** calcula o premio de opcoes (call/put) usando volatilidade historica (252 pregoes) e taxa SELIC, persistindo d1, d2 e o valor total do contrato para auditoria. *(Melhoria futura: substituir a volatilidade historica por um modelo de aprendizado de maquina que preveja uma volatilidade futura mais proxima da realidade de mercado.)*
 - **Motor de cenarios:** gera automaticamente 3 strikes (K-10%, K, K+10%) mais o cenario proposto pelo usuario, recomenda o melhor e calcula a curva de payoff (P&L) de cada cenario.
 - **Pipeline de dados de mercado:** coleta periodica (Celery Beat) de cambio, SELIC e IPCA (BCB) e precos de commodities (B3, CEPEA), com validacao de qualidade em duas etapas (estrutural e outlier) e upsert sem duplicatas.
 - **Comercio exterior:** consolidacao de dados de exportacao e indices, com exportacao para Excel.
@@ -477,11 +477,16 @@ Base URL: `http://localhost:8000/api/v1/`
 
 ## Deploy
 
-| Componente | Plataforma | Branch de Producao |
-|-----------|-----------|-------------------|
-| Backend (API + Celery) | Render | `main` |
-| Frontend (app) | Vercel | `main` |
-| Landing Page | Vercel | `main` |
+Todos os deploys previstos para producao estao concluidos.
+
+| Componente | Plataforma | Branch de Producao | URL |
+|-----------|-----------|-------------------|-----|
+| Backend (API + Celery) | Render | `main` | https://agro-comex.onrender.com |
+| Frontend (app) | Vercel | `main` | https://agro-comex-git-hml-torres-projects-3f0de638.vercel.app |
+| Landing Page | Vercel | `main` | https://agro-comex-landing.vercel.app |
+| Redis (broker/result Celery) | Render | service `red-d8pk9vnlk1mc73eff6l0` | — |
+| Celery worker + beat | Render | service `srv-d8plgrbtqb8s738a576g` (mesma instancia) | — |
+| Banco de dados | Neon (serverless PostgreSQL) | projeto `agro-comex-prod` | — |
 
 O branch `hml` e utilizado como ambiente de homologacao (staging).
 
