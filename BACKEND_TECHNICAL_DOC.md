@@ -664,7 +664,7 @@ backend/chatbot/
 - `unique_together = ("solicitacao", "tipo_alerta")`
 - `db_table = "chatbot_estado_alerta_analise"`
 
-Constante `TIPO_ALERTA_CHOICES`: `cenario_nao_escolhido`, `cotacao_cruzou`, `melhor_momento`.
+Constante `TIPO_ALERTA_CHOICES`: `cenario_nao_escolhido`, `cotacao_cruzou`, `melhor_momento`, `abertura` ("Abertura proativa", usado pela saudacao proativa de abertura da pagina `/messages`).
 
 **`AnaliseEmbedding`**
 - `analise`: OneToOneField para `analises.SolicitacaoAnalise` (CASCADE, related_name="embedding")
@@ -863,6 +863,10 @@ Factory `make_listagem_tool(django_user)` que retorna a tool `listar_analises(co
 
 Registrada como sexta tool em `create_agent_executor` (`chatbot/agent.py`), via `make_listagem_tool(django_user)`.
 
+**Reforco no `SYSTEM_PROMPT` (`chatbot/agent.py`)**: a instrucao da tool `listar_analises` foi reforcada para deixar explicito que ela deve SEMPRE ser usada quando o usuario quiser ver, listar, escolher ou TROCAR de analise, em qualquer momento da conversa (inclusive quando ja existe uma analise em contexto, ex.: "quero falar de outra analise"). O agente NUNCA deve enumerar as analises em texto ("Nunca enumere") — a escolha e sempre feita pelos cards. Detalhes informados (commodity, tipo, status) sao repassados como filtros da tool.
+
+Alem disso, o bloco `ANALISE_CONTEXT_TEMPLATE` (`<contexto_analise>`) ganhou uma excecao explicita: alem de o Mauro nunca perguntar qual analise discutir (ja a conhece), quando o usuario pedir explicitamente para falar de OUTRA analise ele deve chamar `listar_analises` para que o usuario escolha outra pelos cards.
+
 #### Frame `cards` no stream (`chatbot/views.py`)
 
 `ChatStreamView` consome `analise_id` do body por turno: se presente, vincula a `SolicitacaoAnalise` filtrada por `id=analise_id, usuario__user=request.user`; caso contrario usa `conversation.analise_id`.
@@ -878,6 +882,9 @@ data: {"tipo": "cards", "payload": [...]}\n\n
 | Metodo | URL | Descricao |
 |--------|-----|-----------|
 | GET | `/api/v1/chat/proativo/analises/` | Lista analises do usuario para o `AnaliseCardPicker`. Query params: `busca` (com fallback para `commodity`), `tipo`, `status`. Limite fixo `qs[:12]`. Resposta `{"analises": [...]}` serializada por `SolicitacaoAnaliseReadSerializer` |
+| POST | `/api/v1/chat/proativo/abertura/` | Gera a saudacao proativa de abertura da pagina `/messages`. Body opcional `{ client_hour?: int 0..23 }` (400 se fora do intervalo); na ausencia usa a hora local do servidor. Sempre cria e persiste um `ConversationMessage` (`role="ai"`, `is_proativa=True`, `tipo_alerta="abertura"`) com texto gerado one-shot pelo agente (saudacao por periodo + resumo do que ha de novo/pendente nas analises, sem inventar dados). Resposta `201` `{"created": true, "message": <ProativoMessageSerializer>}`. Sem dedup no servidor — o controle de "uma vez por sessao" e feito no frontend |
+
+`ProativoAberturaView` (`generics.GenericAPIView`, `IsAuthenticated`, `name="proativo_abertura"`): valida `client_hour` (inteiro 0-23) e, se ausente, usa `timezone.localtime().hour`; monta a saudacao por periodo via `_get_saudacao`, resolve a conversa proativa do usuario, invoca `create_agent_executor(request.user, None)` com uma instrucao de cumprimentar pelo primeiro nome e resumir novidades/pendencias em ate 4 frases, persiste a mensagem e retorna `201`.
 
 O endpoint `GET /api/v1/chat/proativo/nao-lidas/` passa a incluir, alem de `nao_lidas`, o campo `solicitacoes` (lista de `solicitacao_id` distintos das mensagens proativas nao lidas): `{"nao_lidas": <count>, "solicitacoes": [<ids>]}`.
 

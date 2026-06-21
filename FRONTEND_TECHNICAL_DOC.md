@@ -594,6 +594,11 @@ Servico HTTP do chatbot. Usa `apiFetch` com Bearer token automatico.
 - `POST /api/v1/chat/proativo/marcar-lidas/`
 - Marca todas as mensagens proativas como lidas
 
+**`getProativoAbertura(clientHour?: number): Promise<{ created: boolean; message: ProativoMessage | null }>`**
+- `POST /api/v1/chat/proativo/abertura/`
+- Body inclui `client_hour` apenas quando `clientHour !== undefined`; caso contrario envia `{}` (backend usa a hora local do servidor)
+- Dispara a saudacao proativa de abertura da pagina `/messages`; o backend sempre cria e persiste a mensagem (`tipo_alerta="abertura"`) e a retorna em `message`
+
 ---
 
 ### ChatMessage
@@ -675,18 +680,41 @@ Badge numerico exibido junto ao item "Mensagens" no menu superior (desktop e mob
 
 **Arquivo:** `src/app/messages/page.tsx`
 
-Pagina dedicada ao thread de mensagens proativas do Mauro. Requer autenticacao.
+Pagina dedicada ao thread de mensagens proativas do Mauro. Requer autenticacao (auth guard: redireciona para `/login` se `!isAuthenticated`).
 
 - No mount, chama `getProativoConversa()` para carregar a thread e `marcarProativoLidas()` para zerar o badge
 - Mensagens proativas destacadas visualmente com o token `--accent`
 - O usuario pode responder via `streamMessage` existente, usando o `conversation_id` da conversa proativa
 
-**Fase 2 — selecao de analise, filtro NL e permissao mid-conversa:**
+**Layout — TopMenu:**
 
-- Renderiza `<AnaliseCardPicker analises={cards} onSelecionar={(id) => setAnaliseId(id)} />` enquanto nenhuma analise esta selecionada (`!analiseId`)
-- Ao enviar, chama `streamMessage(..., { analiseId: analiseId ?? undefined, onCards: (c) => setCards(c) })`; o `onCards` recebe os cards do frame `cards` do stream e atualiza o estado `cards`. O filtro em linguagem natural ocorre via a tool `listar_analises` do agente, que devolve os cards filtrados
-- `<TypingIndicator label={conferindo ? "conferindo atualizacao..." : undefined} />` durante a conferencia
-- Permissao mid-conversa: `useEffect` com polling a cada 45s chama `getProativoNaoLidas()` e, se `solicitacoes.includes(analiseId)`, abre o prompt ("Chegou dado novo sobre essa analise. Quer que eu confira agora?") com os botoes "Sim" (`confirmarPermissao` — `marcarProativoLidas()` e dispara `enviar(...)` perguntando se a analise mudou) e "Agora nao" (`negarPermissao` — `marcarProativoLidas()` sem enviar)
+- Renderiza `<TopMenu onLogout={logout} />`; a area de conteudo usa `pt-24` para compensar o offset do menu superior fixo, garantindo que o topo do thread nao fique encoberto ao rolar
+
+**Modelo de mensagem `UiMessage` (uniao discriminada por `kind`):**
+
+- `TextMessage`: `{ id, kind: "text", role: "human" | "ai", content: string, isProativa: boolean }`
+- `CardsMessage`: `{ id, kind: "cards", role: "ai", cards: AnaliseCard[], isProativa: boolean }`
+- `type UiMessage = TextMessage | CardsMessage`
+
+**Cards inline (selecao/troca de analise):**
+
+- Ao enviar, chama `streamMessage(..., { analiseId: analiseId ?? undefined, onCards: (c) => ... })`. O callback `onCards` recebe os cards do frame `cards` do stream (tool `listar_analises`), filtra a analise atualmente em contexto (`cards.filter((card) => card.id !== analiseId)`) e insere uma `CardsMessage` inline no thread (antes da ultima mensagem AI de texto) — os cards aparecem na propria conversa, nao como picker fixo
+- `<AnaliseCardPicker>` renderiza cada `CardsMessage`; ao clicar, `onSelecionar` define `analiseId` como contexto da conversa
+- Filtro em linguagem natural ("minha call de cafe", "quero falar de outra analise") ocorre via a tool `listar_analises` do agente, que devolve os cards ja filtrados
+
+**Typing indicator (correcao do quadrado fantasma):**
+
+- `mostrarTyping` so e verdadeiro quando ha streaming e a ultima mensagem e uma bolha AI de texto vazia (`kind === "text" && role === "ai" && content === ""`)
+- A bolha AI vazia e suprimida na renderizacao (retorna `null`), evitando o "balao fantasma" acima da animacao; o `<TypingIndicator />` e exibido no lugar (com `label="conferindo atualizacao..."` durante a conferencia mid-conversa)
+
+**Abertura proativa (uma vez por sessao):**
+
+- No mount (apos autenticado), guarda via `sessionStorage["mauro_abertura_feita"]`: se a chave nao existe, define-a ANTES do await e chama `getProativoAbertura(new Date().getHours())` (best-effort, erros silenciados)
+- A chave e limpa no logout (`sessionStorage.removeItem("mauro_abertura_feita")` em `contexts/AuthContext.tsx`), de modo que um novo login — mesmo no mesmo dia — gera nova saudacao. Nao ha dedup no servidor; o controle de frequencia e inteiramente do frontend (uma vez por sessao)
+
+**Permissao mid-conversa (polling 45s preservado):**
+
+- `useEffect` com polling a cada 45s chama `getProativoNaoLidas()` e, se `solicitacoes.includes(analiseId)`, abre o prompt ("Chegou dado novo sobre essa analise. Quer que eu confira agora?") com os botoes "Sim" (`marcarProativoLidas()` e dispara o envio perguntando se a analise mudou) e "Agora nao" (`marcarProativoLidas()` sem enviar)
 
 ---
 

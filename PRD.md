@@ -104,6 +104,13 @@ Plataforma de inteligencia para o agronegocio com foco em comercio exterior, int
   - Backend: frame `cards` no stream (`on_tool_end` de `listar_analises` em `ChatStreamView`) e `analise_id` por turno
   - Backend: endpoint `GET /api/v1/chat/proativo/analises/` (params `busca`/`commodity`/`tipo`/`status`) e campo `solicitacoes` na resposta de `/nao-lidas/`
   - Frontend: `AnaliseCardPicker` (selecao de analise antes da conversa), filtro em linguagem natural via tool de listagem, `analiseId` no `streamMessage`, label "conferindo atualizacao..." no `TypingIndicator` e prompt de permissao mid-conversa em `/messages`
+- [x] Mauro proativo — melhorias da pagina `/messages`: abertura proativa, cards inline e correcoes de UX
+  - Backend: endpoint `POST /api/v1/chat/proativo/abertura/` (IsAuthenticated) que sempre gera e persiste uma saudacao proativa (`tipo_alerta="abertura"`) com resumo do que ha de novo/pendente; body opcional `client_hour` (0..23); sem dedup no servidor
+  - Backend: novo `tipo_alerta` `"abertura"` em `TIPO_ALERTA_CHOICES`
+  - Backend: reforco do `SYSTEM_PROMPT` do Mauro — a tool `listar_analises` deve SEMPRE ser usada para ver/trocar de analise e o agente nunca enumera analises em texto; `ANALISE_CONTEXT_TEMPLATE` ganha excecao para chamar `listar_analises` quando o usuario pede outra analise
+  - Frontend: `getProativoAbertura(clientHour?)` em `chatService.ts`
+  - Frontend: `/messages` reescrita — TopMenu fixo (offset `pt-24`) + auth guard; modelo de mensagem `UiMessage` (uniao `kind: "text" | "cards"`); cards renderizados inline (filtrando a analise em contexto); correcao do "balao fantasma" durante "Digitando..."; polling 45s preservado
+  - Frontend: abertura proativa dispara uma vez por sessao via `sessionStorage["mauro_abertura_feita"]`, limpa no logout (`AuthContext`)
 
 ### Infraestrutura
 
