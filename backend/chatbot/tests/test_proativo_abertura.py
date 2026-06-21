@@ -44,13 +44,15 @@ class ProativoAberturaTest(TestCase):
         self.assertEqual(qs.count(), 1)
 
     @patch("chatbot.views.create_agent_executor")
-    def test_nao_duplica_no_mesmo_periodo(self, mock_create):
+    def test_cada_chamada_cria_nova_abertura(self, mock_create):
         mock_create.return_value = _fake_executor("Bom-dia, Joao!")
-        self.client.post("/api/v1/chat/proativo/abertura/", {"client_hour": 9}, format="json")
-        resp = self.client.post("/api/v1/chat/proativo/abertura/", {"client_hour": 10}, format="json")
-        self.assertEqual(resp.status_code, 200)
-        self.assertFalse(resp.json()["created"])
+        resp1 = self.client.post("/api/v1/chat/proativo/abertura/", {"client_hour": 9}, format="json")
+        resp2 = self.client.post("/api/v1/chat/proativo/abertura/", {"client_hour": 10}, format="json")
+        self.assertEqual(resp1.status_code, 201)
+        self.assertTrue(resp1.json()["created"])
+        self.assertEqual(resp2.status_code, 201)
+        self.assertTrue(resp2.json()["created"])
         qs = ConversationMessage.objects.filter(
             conversation__user=self.user, tipo_alerta="abertura"
         )
-        self.assertEqual(qs.count(), 1)
+        self.assertEqual(qs.count(), 2)

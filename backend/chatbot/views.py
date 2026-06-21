@@ -304,25 +304,11 @@ class ProativoAberturaView(generics.GenericAPIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        agora = timezone.localtime()
         if hour is None:
-            hour = agora.hour
+            hour = timezone.localtime().hour
         saudacao = _get_saudacao(hour)
-        periodo = saudacao
 
         conversa = _conversa_proativa_do_usuario(request.user)
-        ultima = (
-            conversa.messages.filter(tipo_alerta="abertura")
-            .order_by("-created_at")
-            .first()
-        )
-        if ultima:
-            ult_local = timezone.localtime(ultima.created_at)
-            if ult_local.date() == agora.date():
-                return Response(
-                    {"created": False, "message": ProativoMessageSerializer(ultima).data},
-                    status=status.HTTP_200_OK,
-                )
 
         nome = request.user.first_name or request.user.username
         instrucao = (
