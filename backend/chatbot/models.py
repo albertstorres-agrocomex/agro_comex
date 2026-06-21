@@ -7,6 +7,7 @@ TIPO_ALERTA_CHOICES = [
     ("cenario_nao_escolhido", "Cenario nao escolhido"),
     ("cotacao_cruzou", "Cotacao cruzou nivel"),
     ("melhor_momento", "Melhor momento"),
+    ("abertura", "Abertura proativa"),
 ]
 
 
