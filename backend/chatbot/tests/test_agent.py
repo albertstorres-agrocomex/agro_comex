@@ -79,6 +79,13 @@ class BuildSystemPromptTest(TestCase):
         self.assertIn("0 sacas", prompt)
 
 
+    def test_prompt_obriga_listar_analises_via_tool(self):
+        from chatbot.agent import _build_system_prompt
+        prompt = _build_system_prompt(None)
+        assert "listar_analises" in prompt
+        assert "nunca enumere" in prompt.lower()
+
+
 class CreateAgentExecutorTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
