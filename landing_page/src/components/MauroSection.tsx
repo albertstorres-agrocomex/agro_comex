@@ -1,4 +1,4 @@
-import { MessageSquare, Search, BarChart2, Zap } from "lucide-react"
+import { MessageSquare, Search, BarChart2, Zap, BellRing } from "lucide-react"
 
 const recursos = [
   {
@@ -21,9 +21,18 @@ const recursos = [
     titulo: "Streaming em tempo real",
     desc: "Respostas transmitidas token a token via SSE — com indicador de digitacao e sem bloqueio de interface.",
   },
+  {
+    icon: BellRing,
+    titulo: "Abertura proativa",
+    desc: "Na pagina de Mensagens, o Mauro inicia a conversa: comenta as analises que voce registrou e aponta o que merece atencao, sem precisar perguntar.",
+  },
 ]
 
 const mockMsgs = [
+  {
+    role: "mauro",
+    text: "Oi! Vi que voce registrou 2 analises de soja. Quer que eu comente a de outubro?",
+  },
   { role: "user", text: "Como ficou minha analise de soja para outubro?" },
   {
     role: "mauro",

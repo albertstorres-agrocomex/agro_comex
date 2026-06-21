@@ -41,6 +41,7 @@ const funcionalidades = [
   "Dashboard de commodities com graficos de preco em tempo real (Recharts)",
   "Busca semantica em historico de analises via pgvector (extensao Neon)",
   "Streaming de respostas do Mauro via SSE — token a token, sem latencia",
+  "Mensagens proativas: o Mauro abre a conversa sobre as analises registradas, destacando pontos de atencao",
   "Cadastro de usuarios com isolamento completo de dados por conta",
 ]
 
