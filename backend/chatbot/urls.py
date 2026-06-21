@@ -6,6 +6,7 @@ from chatbot.views import (
     ProativoNaoLidasView,
     ProativoMarcarLidasView,
     ProativoAnalisesView,
+    ProativoAberturaView,
 )
 
 urlpatterns = [
@@ -16,4 +17,5 @@ urlpatterns = [
     path("chat/proativo/nao-lidas/", ProativoNaoLidasView.as_view(), name="proativo_nao_lidas"),
     path("chat/proativo/marcar-lidas/", ProativoMarcarLidasView.as_view(), name="proativo_marcar_lidas"),
     path("chat/proativo/analises/", ProativoAnalisesView.as_view(), name="proativo_analises"),
+    path("chat/proativo/abertura/", ProativoAberturaView.as_view(), name="proativo_abertura"),
 ]

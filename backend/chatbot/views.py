@@ -285,3 +285,63 @@ class ProativoAnalisesView(generics.GenericAPIView):
             qs = qs.filter(status=status_q)
         dados = SolicitacaoAnaliseReadSerializer(qs[:12], many=True).data
         return Response({"analises": dados})
+
+
+class ProativoAberturaView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        client_hour = request.data.get("client_hour")
+        hour = None
+        if client_hour is not None:
+            try:
+                hour = int(client_hour)
+                if not 0 <= hour <= 23:
+                    raise ValueError
+            except (TypeError, ValueError):
+                return Response(
+                    {"error": "client_hour deve ser um inteiro entre 0 e 23."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        agora = timezone.localtime()
+        if hour is None:
+            hour = agora.hour
+        saudacao = _get_saudacao(hour)
+        periodo = saudacao
+
+        conversa = _conversa_proativa_do_usuario(request.user)
+        ultima = (
+            conversa.messages.filter(tipo_alerta="abertura")
+            .order_by("-created_at")
+            .first()
+        )
+        if ultima:
+            ult_local = timezone.localtime(ultima.created_at)
+            if ult_local.date() == agora.date():
+                return Response(
+                    {"created": False, "message": ProativoMessageSerializer(ultima).data},
+                    status=status.HTTP_200_OK,
+                )
+
+        nome = request.user.first_name or request.user.username
+        instrucao = (
+            f"Cumprimente {nome} com '{saudacao}' pelo primeiro nome. Em seguida, de "
+            f"forma breve (maximo 4 frases), resuma o que ha de novo ou pendente nas "
+            f"analises dele e sugira qual revisar. Se nao houver nenhuma novidade, apenas "
+            f"convide-o a escolher uma analise para conversar. Nao invente dados."
+        )
+        agent_executor = create_agent_executor(request.user, None)
+        result = agent_executor.invoke({"input": instrucao, "chat_history": []})
+        texto = result.get("output", "")
+        msg = ConversationMessage.objects.create(
+            conversation=conversa,
+            role="ai",
+            content=texto,
+            is_proativa=True,
+            tipo_alerta="abertura",
+        )
+        return Response(
+            {"created": True, "message": ProativoMessageSerializer(msg).data},
+            status=status.HTTP_201_CREATED,
+        )
