@@ -85,6 +85,9 @@ DEBATE_IMPLEMENTACAO_CHATBOT.md
 IMPLEMENTAÇÃO_CHATBOT.md
 README_MAURO.md
 
+# Seed de usuarios com credenciais de dev (nao versionar)
+backend/usuario/management/
+
 # Material de estudo / artefatos de ML (nao versionar)
 02_end_to_end_machine_learning_project.py
 pipeline_ml.svg
