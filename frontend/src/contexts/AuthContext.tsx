@@ -50,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // best-effort: ignorar erros do servidor
     } finally {
       clearAccessToken()
+      sessionStorage.removeItem("mauro_abertura_feita")
       setUser(null)
     }
   }
