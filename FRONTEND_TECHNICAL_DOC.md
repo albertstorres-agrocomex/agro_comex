@@ -680,7 +680,7 @@ Badge numerico exibido junto ao item "Mensagens" no menu superior (desktop e mob
 
 **Arquivo:** `src/app/messages/page.tsx`
 
-Pagina dedicada ao thread de mensagens proativas do Mauro. Requer autenticacao (auth guard: redireciona para `/login` se `!isAuthenticated`).
+Pagina dedicada ao thread de mensagens proativas do Mauro. Requer autenticacao (auth guard: redireciona para `/` se `!isAuthenticated`, consistente com o padrao do Dashboard).
 
 - No mount, chama `getProativoConversa()` para carregar a thread e `marcarProativoLidas()` para zerar o badge
 - Mensagens proativas destacadas visualmente com o token `--accent`
