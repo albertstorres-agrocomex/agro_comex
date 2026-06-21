@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createConversation } from '../chatService'
+import { createConversation, getProativoAbertura } from '../chatService'
 
 vi.mock('../authService', () => ({
   apiFetch: vi.fn(),
@@ -82,5 +82,56 @@ describe('createConversation', () => {
     )
     expect(body).not.toHaveProperty('client_hour')
     expect(body).toHaveProperty('analise_id', 42)
+  })
+})
+
+describe('getProativoAbertura', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('faz POST com client_hour e retorna o corpo', async () => {
+    mockApiFetch.mockResolvedValueOnce(
+      makeOkResponse({
+        created: true,
+        message: {
+          id: '1',
+          role: 'ai',
+          content: 'oi',
+          created_at: '',
+          is_proativa: true,
+          lida_em: null,
+          tipo_alerta: 'abertura',
+          solicitacao: null,
+        },
+      })
+    )
+
+    const res = await getProativoAbertura(9)
+
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      '/api/v1/chat/proativo/abertura/',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(res.created).toBe(true)
+    expect(res.message?.content).toBe('oi')
+  })
+
+  it('envia body vazio quando clientHour nao fornecido', async () => {
+    mockApiFetch.mockResolvedValueOnce(
+      makeOkResponse({ created: false, message: null })
+    )
+
+    await getProativoAbertura()
+
+    const body = JSON.parse(
+      (mockApiFetch.mock.calls[0][1] as RequestInit).body as string
+    )
+    expect(body).toEqual({})
+  })
+
+  it('lanca erro com status quando resposta nao ok', async () => {
+    mockApiFetch.mockResolvedValueOnce({ ok: false, status: 500 } as Response)
+    await expect(getProativoAbertura(10)).rejects.toEqual({ status: 500 })
   })
 })

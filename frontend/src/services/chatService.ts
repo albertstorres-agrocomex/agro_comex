@@ -120,6 +120,18 @@ export async function getProativoConversa(): Promise<{
   return res.json()
 }
 
+export async function getProativoAbertura(
+  clientHour?: number,
+): Promise<{ created: boolean; message: ProativoMessage | null }> {
+  const res = await apiFetch('/api/v1/chat/proativo/abertura/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(clientHour !== undefined ? { client_hour: clientHour } : {}),
+  })
+  if (!res.ok) throw { status: res.status }
+  return res.json()
+}
+
 export async function marcarProativoLidas(): Promise<{ marcadas: number }> {
   const res = await apiFetch('/api/v1/chat/proativo/marcar-lidas/', {
     method: 'POST',
