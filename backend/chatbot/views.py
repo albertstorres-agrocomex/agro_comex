@@ -1,4 +1,5 @@
 import json
+from asgiref.sync import sync_to_async
 from django.http import StreamingHttpResponse, HttpResponse
 from django.utils import timezone
 from langchain_core.messages import HumanMessage, AIMessage
@@ -8,6 +9,8 @@ from rest_framework.response import Response
 from chatbot.models import Conversation, ConversationMessage
 from chatbot.serializers import ConversationSerializer, ProativoMessageSerializer
 from chatbot.agent import create_agent_executor
+from chatbot.classificador_selecao import classificar_selecao
+from chatbot.tool_listagem import listar_analises_payload
 from analises.models import SolicitacaoAnalise
 from analises.serializers import SolicitacaoAnaliseReadSerializer
 
@@ -188,35 +191,63 @@ class ChatStreamView(generics.GenericAPIView):
 
         async def event_stream():
             full_response = ""
+            cards_only = False
             try:
-                async for event in agent_executor.astream_events(
-                    {"input": message, "chat_history": history},
-                    version="v2",
-                ):
-                    if event["event"] == "on_chat_model_stream":
-                        chunk = event["data"]["chunk"]
-                        content = chunk.content if hasattr(chunk, "content") else ""
-                        if content:
-                            full_response += content
-                            yield f"data: {json.dumps({'content': content})}\n\n"
-                    elif (
-                        event["event"] == "on_tool_end"
-                        and event.get("name") == "listar_analises"
+                # Gate deterministico: se a intencao for escolher/trocar de analise,
+                # emite SOMENTE os cards de selecao (sem texto, sempre), sem acionar
+                # o agente. Isso elimina a inconsistencia de o LLM decidir ou nao
+                # chamar a tool listar_analises.
+                selecao = await classificar_selecao(
+                    message, analise_context is not None
+                )
+                if selecao.quer_selecionar:
+                    dados = await sync_to_async(listar_analises_payload)(
+                        request.user,
+                        selecao.commodity,
+                        selecao.tipo,
+                        selecao.status,
+                    )
+                    if dados["payload"]:
+                        cards_only = True
+                        yield f"data: {json.dumps(dados)}\n\n"
+                    else:
+                        full_response = (
+                            "Nao encontrei analises suas com esse filtro. "
+                            "Quer ver todas as suas analises?"
+                        )
+                        yield f"data: {json.dumps({'content': full_response})}\n\n"
+                else:
+                    async for event in agent_executor.astream_events(
+                        {"input": message, "chat_history": history},
+                        version="v2",
                     ):
-                        raw_output = event["data"].get("output")
-                        tool_output = getattr(raw_output, "content", raw_output)
-                        frame = _frame_cards(tool_output)
-                        if frame:
-                            yield frame
+                        if event["event"] == "on_chat_model_stream":
+                            chunk = event["data"]["chunk"]
+                            content = chunk.content if hasattr(chunk, "content") else ""
+                            if content:
+                                full_response += content
+                                yield f"data: {json.dumps({'content': content})}\n\n"
+                        elif (
+                            event["event"] == "on_tool_end"
+                            and event.get("name") == "listar_analises"
+                        ):
+                            raw_output = event["data"].get("output")
+                            tool_output = getattr(raw_output, "content", raw_output)
+                            frame = _frame_cards(tool_output)
+                            if frame:
+                                yield frame
             finally:
                 await ConversationMessage.objects.acreate(
                     conversation=conversation, role="human", content=message
                 )
-                await ConversationMessage.objects.acreate(
-                    conversation=conversation,
-                    role="ai",
-                    content=full_response or "(sem resposta)",
-                )
+                # No modo cards-only nao salvamos turno de IA em texto: os cards sao
+                # efemeros e um turno vazio poluiria o historico do agente.
+                if not cards_only:
+                    await ConversationMessage.objects.acreate(
+                        conversation=conversation,
+                        role="ai",
+                        content=full_response or "(sem resposta)",
+                    )
                 yield "data: [DONE]\n\n"
 
         return StreamingHttpResponse(
