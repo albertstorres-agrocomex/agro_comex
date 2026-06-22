@@ -18,11 +18,15 @@ class SelecaoAnalise(BaseModel):
 
     quer_selecionar: bool = Field(
         description=(
-            "True somente quando o usuario quer ESCOLHER, LISTAR, VER ou TROCAR "
-            "qual analise vai discutir (ex: 'quero falar de uma analise de put', "
-            "'me mostra minhas analises', 'quero trocar de analise', 'aquela de soja'). "
-            "False para perguntas sobre a analise ja aberta ('essa analise vale a pena?', "
-            "'qual cenario e melhor?'), saudacoes, ou duvidas gerais de hedge/mercado."
+            "True quando o usuario quer ESCOLHER, LISTAR, VER, TROCAR ou comecar a "
+            "DEBATER/DISCUTIR/FALAR sobre qual analise vai tratar, inclusive quando se "
+            "refere a UMA de suas analises de forma indefinida, sem dizer qual "
+            "(ex: 'quero falar de uma analise de put', 'preciso debater sobre uma de "
+            "minhas analises de call', 'me mostra minhas analises', 'quero trocar de "
+            "analise', 'aquela de soja'). "
+            "False apenas para perguntas sobre a analise JA aberta no contexto "
+            "('essa analise vale a pena?', 'qual cenario e melhor?'), saudacoes, ou "
+            "duvidas gerais de hedge/mercado."
         )
     )
     commodity: str = Field(
@@ -45,12 +49,16 @@ class SelecaoAnalise(BaseModel):
 _SYSTEM = (
     "Voce e um classificador de intencao para o chat do Mauro, especialista em hedge "
     "agricola. Sua unica funcao e decidir se a mensagem do usuario pede para ESCOLHER, "
-    "LISTAR ou TROCAR qual analise sera discutida, e extrair filtros (commodity, tipo, "
-    "status) quando citados. Nao responda a pergunta, apenas classifique.\n"
+    "LISTAR, TROCAR ou comecar a DEBATER/DISCUTIR qual analise sera tratada, e extrair "
+    "filtros (commodity, tipo, status) quando citados. Nao responda a pergunta, apenas "
+    "classifique.\n"
     "Contexto da conversa: {contexto}\n"
     "Se o usuario se referir a analise ja aberta ('essa', 'minha analise', 'a analise'), "
-    "isso NAO e selecao (quer_selecionar=false). Apenas pedidos explicitos de ver/listar/"
-    "escolher/trocar de analise, ou de falar de OUTRA analise, sao selecao."
+    "isso NAO e selecao (quer_selecionar=false). Pedidos de ver/listar/escolher/trocar "
+    "de analise, de falar de OUTRA analise, ou de debater/discutir UMA de suas analises "
+    "de forma indefinida (sem dizer qual) sao selecao (quer_selecionar=true). Se nenhuma "
+    "analise estiver aberta e o usuario quiser debater/discutir uma analise, ele "
+    "necessariamente precisa escolher primeiro, entao e selecao."
 )
 
 
