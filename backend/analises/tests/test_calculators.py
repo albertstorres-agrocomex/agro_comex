@@ -619,3 +619,84 @@ class TestExecutarAnaliseCenarios:
         resultado = executar_analise_cenarios(sol)
         proposto = next(c for c in resultado if c["nome"] == "proposto")
         assert len(proposto["pontos_curva"]) == 25
+
+
+class TestValorTotalAplicaFatorUnidadeSaca:
+    """O premio sai em USD/unidade-padrao (USD/lb para cafe). O valor total do
+    contrato e o lucro maximo precisam converter unidade-padrao -> saca de 60 kg
+    antes de multiplicar pela quantidade de sacas."""
+
+    def _make_sol(self, codigo, tipo_nome="call", preco_exercicio=248,
+                  preco_mercado=248, qtd=100):
+        sol = MagicMock()
+        sol.tipo_derivativo.nome = tipo_nome
+        sol.tipo_derivativo.requer_barreira = False
+        sol.preco_exercicio = preco_exercicio
+        sol.preco_mercado_atual = preco_mercado
+        sol.quantidade_sacas = qtd
+        sol.posicao = "comprador"
+        sol.mes_contrato.data_vencimento = date.today() + timedelta(days=180)
+        sol.commodity.nome = "Cafe Arabica"
+        sol.commodity.codigo = codigo
+        return sol
+
+    @patch("analises.calculators.black_scholes")
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_premio_calculado_permanece_por_unidade(self, mock_selic, mock_vol, mock_bs):
+        from analises.calculators import executar_calculo_bs
+        mock_selic.return_value = 0.05
+        mock_vol.return_value = 0.55
+        mock_bs.return_value = 0.68  # USD/lb
+        sol = self._make_sol(codigo="KC", tipo_nome="call")
+        r = executar_calculo_bs(sol)
+        assert r["premio_calculado"] == 68  # por libra, NAO escalado
+
+    @patch("analises.calculators.black_scholes")
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_cafe_valor_total_aplica_lbs_por_saca(self, mock_selic, mock_vol, mock_bs):
+        from analises.calculators import executar_calculo_bs
+        from dados.limpeza.conversao import LBS_PER_SACA_KC
+        mock_selic.return_value = 0.05
+        mock_vol.return_value = 0.55
+        mock_bs.return_value = 0.68  # USD/lb
+        sol = self._make_sol(codigo="KC", tipo_nome="call", qtd=100)
+        r = executar_calculo_bs(sol)
+        # 68 centavos/lb * 132.277 lb/saca * 100 sacas
+        assert r["valor_total_contrato"] == round(68 * LBS_PER_SACA_KC * 100)
+
+    @patch("analises.calculators.black_scholes")
+    @patch("analises.calculators.calcular_volatilidade")
+    @patch("analises.calculators.obter_taxa_selic")
+    def test_cafe_put_lucro_maximo_aplica_fator(self, mock_selic, mock_vol, mock_bs):
+        from analises.calculators import executar_calculo_bs
+        from dados.limpeza.conversao import LBS_PER_SACA_KC
+        mock_selic.return_value = 0.05
+        mock_vol.return_value = 0.55
+        mock_bs.return_value = 0.50  # USD/lb
+        sol = self._make_sol(codigo="KC", tipo_nome="put", preco_exercicio=200,
+                             preco_mercado=248, qtd=100)
+        r = executar_calculo_bs(sol)
+        # lucro_bruto = K - premio = 2.00 - 0.50 = 1.50 USD/lb
+        assert r["lucro_maximo"] == round(1.50 * 100 * LBS_PER_SACA_KC * 100)
+
+
+class TestCurvaAplicaFatorUnidadeSaca:
+    def test_curva_put_vendedor_lucro_maximo_escalado_por_saca(self):
+        from analises.calculators import calcular_curva_resultado
+        fator = 132.277
+        pontos = calcular_curva_resultado(
+            S=2.48, K=2.00, premio=0.50, posicao="vendedor", tipo="put",
+            unidades_por_saca=fator,
+        )
+        ponto_alto = max(pontos, key=lambda p: p["preco_centavos"])
+        assert ponto_alto["resultado_centavos"] == round(0.50 * fator * 100)
+
+    def test_curva_sem_fator_mantem_comportamento_por_unidade(self):
+        from analises.calculators import calcular_curva_resultado
+        pontos = calcular_curva_resultado(
+            S=2.48, K=2.00, premio=0.50, posicao="vendedor", tipo="put",
+        )
+        ponto_alto = max(pontos, key=lambda p: p["preco_centavos"])
+        assert ponto_alto["resultado_centavos"] == round(0.50 * 100)

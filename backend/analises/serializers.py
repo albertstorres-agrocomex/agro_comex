@@ -2,6 +2,7 @@ from rest_framework import serializers
 from analises.models import SolicitacaoAnalise, ResultadoAnalise, CenarioAnalise, PontoCurvaResultado
 from analises.price_utils import usd_para_centavos, centavos_para_usd
 from analises.calculators_barreira import inferir_direcao, rotulo_barreira
+from dados.limpeza.conversao import unidades_por_saca
 from meses_contrato_futuro.models import MesContratoFurturo as MesContratoFurturoModel
 
 
@@ -215,10 +216,14 @@ class CenarioAnaliseSerializer(serializers.ModelSerializer):
         return centavos_para_usd(obj.premio_centavos)
 
     def get_valor_total(self, obj):
-        qtd = obj.resultado.solicitacao.quantidade_sacas
+        solicitacao = obj.resultado.solicitacao
+        qtd = solicitacao.quantidade_sacas
         if qtd is None:
             return None
-        return centavos_para_usd(obj.premio_centavos * qtd)
+        # premio_centavos esta em USD/unidade-padrao; converte para USD/saca
+        # antes de multiplicar pela quantidade de sacas contratadas.
+        fator_saca = unidades_por_saca(solicitacao.commodity.codigo)
+        return centavos_para_usd(round(obj.premio_centavos * fator_saca * qtd))
 
     def get_ponto_equilibrio(self, obj):
         return centavos_para_usd(obj.preco_exercicio_centavos - obj.premio_centavos)
