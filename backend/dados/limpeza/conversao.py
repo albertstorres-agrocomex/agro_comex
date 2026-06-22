@@ -36,6 +36,35 @@ _CEPEA_UNIDADE_ESPERADA: dict[str, str] = {
 }
 
 
+_UNIDADES_POR_SACA: dict[str, float] = {
+    "KC": LBS_PER_SACA_KC,      # USD/lb -> USD/saca 60 kg (~132.277 lb/saca)
+    "ZC": SACAS_PER_BUSHEL_ZC,  # USD/bu -> USD/saca 60 kg (~2.362 bu/saca, milho)
+    "ZS": SACAS_PER_BUSHEL_ZS,  # USD/bu -> USD/saca 60 kg (~2.205 bu/saca, soja)
+}
+
+
+def unidades_por_saca(codigo: str) -> float:
+    """
+    Fator que converte um preco em USD/unidade-padrao da commodity para
+    USD por saca de 60 kg (libras para cafe, bushels para milho/soja).
+
+    Usado para escalar premio/lucro de Black-Scholes (calculado em USD/unidade)
+    para o valor monetario total do contrato, que e expresso em sacas.
+
+    Codigo nao mapeado retorna 1.0 (sem conversao) com warning, evitando
+    quebrar o calculo para commodities ainda nao cadastradas.
+    """
+    fator = _UNIDADES_POR_SACA.get((codigo or "").upper())
+    if fator is None:
+        logger.warning(
+            "unidades_por_saca: codigo '%s' nao mapeado; usando fator 1.0 "
+            "(valor total nao convertido para saca). Mapeados: %s.",
+            codigo, ", ".join(sorted(_UNIDADES_POR_SACA)),
+        )
+        return 1.0
+    return fator
+
+
 def converter_b3(codigo: str, preco: float, usd_brl: float | None = None) -> float:
     """
     Converte preco retornado pelo B3 para USD na unidade padrao da commodity.

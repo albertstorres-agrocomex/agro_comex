@@ -138,3 +138,33 @@ class TestBarreiraNaLeitura(TestCase):
         data = SolicitacaoAnaliseReadSerializer(sol).data
         assert data["barreira_direcao"] is None
         assert data["barreira_rotulo"] is None
+
+
+class TestCenarioValorTotalFatorUnidadeSaca:
+    """O valor_total do cenario (Custo total dos cards) precisa converter
+    USD/unidade-padrao -> USD/saca antes de multiplicar pela quantidade."""
+
+    def test_valor_total_aplica_fator_para_cafe(self):
+        from unittest.mock import MagicMock
+        from analises.serializers import CenarioAnaliseSerializer
+        from analises.price_utils import centavos_para_usd
+        from dados.limpeza.conversao import LBS_PER_SACA_KC
+
+        obj = MagicMock()
+        obj.premio_centavos = 68
+        obj.resultado.solicitacao.quantidade_sacas = 100
+        obj.resultado.solicitacao.commodity.codigo = "KC"
+
+        resultado = CenarioAnaliseSerializer().get_valor_total(obj)
+        assert resultado == centavos_para_usd(round(68 * LBS_PER_SACA_KC * 100))
+
+    def test_valor_total_none_quando_sem_quantidade(self):
+        from unittest.mock import MagicMock
+        from analises.serializers import CenarioAnaliseSerializer
+
+        obj = MagicMock()
+        obj.premio_centavos = 68
+        obj.resultado.solicitacao.quantidade_sacas = None
+        obj.resultado.solicitacao.commodity.codigo = "KC"
+
+        assert CenarioAnaliseSerializer().get_valor_total(obj) is None

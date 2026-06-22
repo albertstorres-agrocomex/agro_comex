@@ -29,6 +29,30 @@ class TestConverterB3:
         with pytest.raises(ValueError, match="nao mapeado"):
             converter_b3("XX", 100.0)
 
+
+class TestUnidadesPorSaca:
+    """Fator que converte um preco USD/unidade-padrao para USD/saca de 60 kg."""
+
+    def test_kc_retorna_lbs_por_saca(self):
+        from dados.limpeza.conversao import unidades_por_saca, LBS_PER_SACA_KC
+        assert unidades_por_saca("KC") == LBS_PER_SACA_KC
+
+    def test_zc_retorna_bushels_por_saca_milho(self):
+        from dados.limpeza.conversao import unidades_por_saca, SACAS_PER_BUSHEL_ZC
+        assert unidades_por_saca("ZC") == SACAS_PER_BUSHEL_ZC
+
+    def test_zs_retorna_bushels_por_saca_soja(self):
+        from dados.limpeza.conversao import unidades_por_saca, SACAS_PER_BUSHEL_ZS
+        assert unidades_por_saca("ZS") == SACAS_PER_BUSHEL_ZS
+
+    def test_case_insensitive(self):
+        from dados.limpeza.conversao import unidades_por_saca, LBS_PER_SACA_KC
+        assert unidades_por_saca("kc") == LBS_PER_SACA_KC
+
+    def test_codigo_desconhecido_retorna_1(self):
+        from dados.limpeza.conversao import unidades_por_saca
+        assert unidades_por_saca("XX") == 1.0
+
     def test_zs_valor_real_proximo_cbot(self):
         """465 USD/MT deve resultar em ~12.66 USD/bu (CBOT ZS ~11.60 em mar/26)."""
         from dados.limpeza.conversao import converter_b3
