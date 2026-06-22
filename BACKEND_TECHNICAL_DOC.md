@@ -853,25 +853,35 @@ Os limiares (2% / 150% / 5 dias uteis) sao defaults; revisar com uso real e, se 
 
 `_avaliar_melhor_momento(analise)`: avalia os tres sinais em ordem (`proximo_knockout`, `intrinseco_relevante`, `proximo_vencimento`), acumula os rotulos `"knockout"`, `"intrinseco"`, `"vencimento"`. Estado `"disparado"` quando ha ao menos um sinal, `"normal"` caso contrario. `tipo_alerta` = `"melhor_momento"`. O anti-spam continua via `EstadoAlertaAnalise` (so emite na transicao de estado).
 
-#### Tool `listar_analises` (`chatbot/tool_listagem.py`)
+#### Tool `listar_analises` e `listar_analises_payload` (`chatbot/tool_listagem.py`)
 
-Factory `make_listagem_tool(django_user)` que retorna a tool `listar_analises(commodity="", tipo="", status="") -> str`. Filtra apenas as analises do `django_user` (limite `qs[:12]`) e retorna JSON:
+A logica de montagem dos cards vive em `listar_analises_payload(django_user, commodity="", tipo="", status="") -> dict`, que filtra apenas as analises do `django_user` (limite `qs[:12]`, escopo `usuario=perfil`) e retorna o dict:
 
 ```json
 {"tipo": "cards", "payload": [{"id": 1, "commodity": "Soja", "tipo": "CALL", "status": "ativa"}]}
 ```
 
-Registrada como sexta tool em `create_agent_executor` (`chatbot/agent.py`), via `make_listagem_tool(django_user)`.
+`make_listagem_tool(django_user)` retorna a tool `listar_analises(commodity="", tipo="", status="") -> str`, que apenas serializa `listar_analises_payload(...)` com `json.dumps`. Registrada como sexta tool em `create_agent_executor` (`chatbot/agent.py`). O mesmo `listar_analises_payload` e reutilizado pelo caminho deterministico de selecao (ver classificador abaixo), evitando duplicar a query.
 
 **Reforco no `SYSTEM_PROMPT` (`chatbot/agent.py`)**: a instrucao da tool `listar_analises` foi reforcada para deixar explicito que ela deve SEMPRE ser usada quando o usuario quiser ver, listar, escolher ou TROCAR de analise, em qualquer momento da conversa (inclusive quando ja existe uma analise em contexto, ex.: "quero falar de outra analise"). O agente NUNCA deve enumerar as analises em texto ("Nunca enumere") — a escolha e sempre feita pelos cards. Detalhes informados (commodity, tipo, status) sao repassados como filtros da tool.
 
 Alem disso, o bloco `ANALISE_CONTEXT_TEMPLATE` (`<contexto_analise>`) ganhou uma excecao explicita: alem de o Mauro nunca perguntar qual analise discutir (ja a conhece), quando o usuario pedir explicitamente para falar de OUTRA analise ele deve chamar `listar_analises` para que o usuario escolha outra pelos cards.
 
+#### Gate deterministico de selecao (`chatbot/classificador_selecao.py`)
+
+Deixar o agente (gpt-4o-mini) decidir se chama `listar_analises` tornava os cards de selecao inconsistentes: as vezes o LLM respondia em texto, as vezes misturava texto + cards. O modulo `classificador_selecao.py` isola essa decisao numa chamada LLM curta e dedicada com saida estruturada (Pydantic `SelecaoAnalise`: `quer_selecionar: bool`, `commodity`, `tipo`, `status`), `temperature=0`.
+
+`classificar_selecao(mensagem, tem_analise_em_contexto=False, classificador=None)` (assincrona) classifica a intencao; em qualquer falha do LLM retorna `quer_selecionar=False` (fail-open para o fluxo normal do agente). O argumento `classificador` permite injetar um runnable nos testes.
+
 #### Frame `cards` no stream (`chatbot/views.py`)
 
 `ChatStreamView` consome `analise_id` do body por turno: se presente, vincula a `SolicitacaoAnalise` filtrada por `id=analise_id, usuario__user=request.user`; caso contrario usa `conversation.analise_id`.
 
-No `event_stream`, ao detectar `event["event"] == "on_tool_end"` com `name == "listar_analises"`, extrai `raw_output = event["data"].get("output")` e normaliza com `getattr(raw_output, "content", raw_output)` (trata variacao str vs objeto do `astream_events` v2). O resultado passa por `_frame_cards(output)`, que retorna `None` se nao for string ou JSON valido, ou se `dados.get("tipo") != "cards"`; caso valido, emite o frame SSE:
+No inicio do `event_stream`, antes de acionar o agente, roda-se `classificar_selecao(message, analise_context is not None)`:
+
+- **Intencao de selecao com resultados** (`quer_selecionar=True` e payload nao vazio): emite SOMENTE o frame de cards (via `listar_analises_payload`), sem texto e sem invocar o agente. `cards_only=True` faz com que nenhum turno de IA em texto seja persistido (cards sao efemeros; um turno vazio poluiria o historico). Esta e a garantia central: quando o usuario quer escolher uma analise, sempre saem cards e nunca texto.
+- **Intencao de selecao sem resultados** (payload vazio): como o `AnaliseCardPicker` nao renderiza lista vazia, emite-se um unico frame de texto curto ("Nao encontrei analises suas com esse filtro...") em vez de cards.
+- **Sem intencao de selecao**: fluxo normal do agente via `astream_events`. Texto sai em frames `{'content': ...}`; se o agente ainda assim chamar `listar_analises`, o `on_tool_end` passa o output por `_frame_cards(output)` (que retorna `None` se nao for JSON valido com `tipo=="cards"`) e emite o frame de cards.
 
 ```
 data: {"tipo": "cards", "payload": [...]}\n\n
