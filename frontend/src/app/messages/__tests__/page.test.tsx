@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import MessagesPage from '../page'
 
 vi.mock('next/navigation', () => ({
@@ -23,11 +23,13 @@ import {
   getProativoConversa,
   marcarProativoLidas,
   getProativoAbertura,
+  streamMessage,
 } from '@/services/chatService'
 
 const mockConversa = vi.mocked(getProativoConversa)
 const mockAbertura = vi.mocked(getProativoAbertura)
 const mockLidas = vi.mocked(marcarProativoLidas)
+const mockStream = vi.mocked(streamMessage)
 
 describe('MessagesPage', () => {
   beforeEach(() => {
@@ -57,5 +59,34 @@ describe('MessagesPage', () => {
     })
     render(<MessagesPage />)
     expect(await screen.findByText(/Bom-dia, Joao/)).toBeInTheDocument()
+  })
+
+  it('inicia o debate ao clicar num card de analise (envia mensagem com o analise_id)', async () => {
+    // Primeira chamada emite os cards de selecao; chamadas seguintes apenas finalizam.
+    mockStream.mockImplementation(async (_cid, _msg, _onChunk, onDone, opts) => {
+      if (opts?.onCards) {
+        opts.onCards([
+          { id: 7, commodity_nome: 'Soja', tipo_derivativo_nome: 'Put', status: 'pendente' },
+        ])
+      }
+      onDone()
+    })
+
+    render(<MessagesPage />)
+
+    // Dispara uma mensagem do usuario para que os cards sejam renderizados.
+    const input = await screen.findByPlaceholderText(/Fale com o Mauro/)
+    fireEvent.change(input, { target: { value: 'minhas analises de soja' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    const card = await screen.findByText('Soja')
+    mockStream.mockClear()
+    fireEvent.click(card)
+
+    await waitFor(() => {
+      expect(mockStream).toHaveBeenCalled()
+      const opts = mockStream.mock.calls[0][4]
+      expect(opts?.analiseId).toBe(7)
+    })
   })
 })

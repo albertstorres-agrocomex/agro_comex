@@ -100,8 +100,9 @@ export default function MessagesPage() {
   }, [analiseId])
 
   const enviar = useCallback(
-    async (texto: string, conferir = false) => {
+    async (texto: string, conferir = false, analiseIdOverride?: number) => {
       if (!conversationId || !texto.trim() || isStreaming) return
+      const idAnalise = analiseIdOverride ?? analiseId ?? undefined
       setMessages((prev) => [
         ...prev,
         { id: `h-${Date.now()}`, kind: "text", role: "human", content: texto, isProativa: false },
@@ -126,7 +127,7 @@ export default function MessagesPage() {
           setConferindo(false)
         },
         {
-          analiseId: analiseId ?? undefined,
+          analiseId: idAnalise,
           onCards: (c) =>
             setMessages((prev) => {
               const copia = [...prev]
@@ -134,7 +135,7 @@ export default function MessagesPage() {
                 id: `c-${Date.now()}`,
                 kind: "cards",
                 role: "ai",
-                cards: c.filter((card) => card.id !== analiseId),
+                cards: c.filter((card) => card.id !== idAnalise),
                 isProativa: false,
               }
               copia.splice(copia.length - 1, 0, cardsMsg)
@@ -144,6 +145,18 @@ export default function MessagesPage() {
       )
     },
     [conversationId, isStreaming, analiseId],
+  )
+
+  const selecionarAnalise = useCallback(
+    (id: number, cards: AnaliseCard[]) => {
+      setAnaliseId(id)
+      const card = cards.find((c) => c.id === id)
+      const nome = card
+        ? `${card.commodity_nome} (${card.tipo_derivativo_nome})`
+        : "essa analise"
+      enviar(`Quero discutir essa analise de ${nome}. Qual a sua visao sobre ela?`, false, id)
+    },
+    [enviar],
   )
 
   const confirmarPermissao = async () => {
@@ -171,7 +184,7 @@ export default function MessagesPage() {
               <AnaliseCardPicker
                 key={m.id}
                 analises={m.cards}
-                onSelecionar={(id) => setAnaliseId(id)}
+                onSelecionar={(id) => selecionarAnalise(id, m.cards)}
               />
             )
           }
