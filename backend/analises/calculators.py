@@ -14,6 +14,8 @@ except ImportError:  # pragma: no cover
     CacheDadosMercado = None  # type: ignore[assignment,misc]
     DadosMacroeconomicos = None  # type: ignore[assignment,misc]
 
+from dados.limpeza.conversao import unidades_por_saca
+
 PESO_SACA_KG: dict[str, int] = {
     "SOJA":   60,
     "MILHO":  60,
@@ -116,13 +118,17 @@ def calcular_curva_resultado(
     premio: float,
     posicao: str,
     tipo: str,
+    unidades_por_saca: float = 1.0,
 ) -> list[dict]:
     """
     Gera 25 pontos de resultado financeiro para um cenario,
     cobrindo precos de 50% a 150% de S.
 
-    posicao : "comprador" | "vendedor"
-    tipo    : "call" | "put"
+    posicao            : "comprador" | "vendedor"
+    tipo               : "call" | "put"
+    unidades_por_saca  : fator que converte resultado USD/unidade-padrao ->
+                         USD/saca (ex: ~132.277 lb/saca para cafe). Default 1.0
+                         mantem a curva na unidade-padrao.
     """
     min_preco = S * 0.5
     max_preco = S * 1.5
@@ -143,7 +149,7 @@ def calcular_curva_resultado(
 
         pontos.append({
             "preco_centavos":     round(preco * 100),
-            "resultado_centavos": round(resultado * 100),
+            "resultado_centavos": round(resultado * unidades_por_saca * 100),
         })
     return pontos
 
@@ -203,12 +209,15 @@ def executar_calculo_bs(solicitacao) -> dict:
 
     percentual = round((premio_reais / S) * 100, 4) if S > 0 else None
 
+    # premio sai em USD/unidade-padrao (USD/lb para cafe, USD/bu para graos).
+    # Converte para USD/saca antes de escalar pelo numero de sacas contratadas.
+    fator_saca = unidades_por_saca(solicitacao.commodity.codigo)
     qtd = solicitacao.quantidade_sacas
-    valor_total = round(premio_centavos * qtd) if qtd else None
+    valor_total = round(premio_centavos * fator_saca * qtd) if qtd else None
 
     if tipo_nome == "put":
-        lucro_bruto = K - premio_reais
-        lucro_maximo = round(max(lucro_bruto, 0) * 100 * qtd) if qtd else round(max(lucro_bruto, 0) * 100)
+        lucro_bruto = max(K - premio_reais, 0)
+        lucro_maximo = round(lucro_bruto * 100 * fator_saca * qtd) if qtd else round(lucro_bruto * 100 * fator_saca)
     else:
         lucro_maximo = None
 
@@ -271,12 +280,13 @@ def executar_calculo_barreira(solicitacao) -> dict:
 
     percentual = round((premio_reais / S) * 100, 4) if S > 0 else None
 
+    fator_saca = unidades_por_saca(solicitacao.commodity.codigo)
     qtd = solicitacao.quantidade_sacas
-    valor_total = round(premio_centavos * qtd) if qtd else None
+    valor_total = round(premio_centavos * fator_saca * qtd) if qtd else None
 
     if tipo == "put":
-        lucro_bruto = K - premio_reais
-        lucro_maximo = round(max(lucro_bruto, 0) * 100 * qtd) if qtd else round(max(lucro_bruto, 0) * 100)
+        lucro_bruto = max(K - premio_reais, 0)
+        lucro_maximo = round(lucro_bruto * 100 * fator_saca * qtd) if qtd else round(lucro_bruto * 100 * fator_saca)
     else:
         lucro_maximo = None
 
@@ -340,6 +350,7 @@ def executar_analise_cenarios(solicitacao) -> list[dict]:
     S = S_centavos / 100.0
     tipo_nome = solicitacao.tipo_derivativo.nome.lower()
     posicao = solicitacao.posicao or "comprador"
+    fator_saca = unidades_por_saca(solicitacao.commodity.codigo)
 
     cenarios: list[dict] = []
 
@@ -355,7 +366,7 @@ def executar_analise_cenarios(solicitacao) -> list[dict]:
 
         K = K_centavos / 100.0
         premio = resultado_bs["premio_calculado"] / 100.0
-        pontos_curva = calcular_curva_resultado(S, K, premio, posicao, tipo_nome)
+        pontos_curva = calcular_curva_resultado(S, K, premio, posicao, tipo_nome, fator_saca)
 
         cenarios.append({
             "nome":                     nome,
@@ -372,7 +383,7 @@ def executar_analise_cenarios(solicitacao) -> list[dict]:
 
     K_proposto = K_proposto_centavos / 100.0
     premio_proposto = resultado_proposto["premio_calculado"] / 100.0
-    pontos_proposto = calcular_curva_resultado(S, K_proposto, premio_proposto, posicao, tipo_nome)
+    pontos_proposto = calcular_curva_resultado(S, K_proposto, premio_proposto, posicao, tipo_nome, fator_saca)
 
     cenarios.append({
         "nome":                     "proposto",

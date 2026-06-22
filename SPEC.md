@@ -179,8 +179,8 @@ Regras adicionais para opcoes com barreira (`requer_barreira=True`), validadas n
 | solicitacao | ForeignKey (SolicitacaoAnalise) | CASCADE |
 | premio_calculado | IntegerField (null) | Preco da opcao calculado pelo Black-Scholes, em centavos |
 | percentual_premio | DecimalField(12,4) (null) | Premio como percentual do preco de mercado atual |
-| valor_total_contrato | IntegerField (null) | Premio multiplicado pela quantidade de sacas, em centavos |
-| lucro_maximo | IntegerField (null) | (strike - premio) * qtd para put; null para call |
+| valor_total_contrato | IntegerField (null) | Custo total do premio em centavos. O premio sai em USD/unidade-padrao (USD/lb p/ cafe, USD/bu p/ graos); e convertido para USD/saca via `unidades_por_saca(codigo)` antes de multiplicar pela quantidade de sacas |
+| lucro_maximo | IntegerField (null) | (strike - premio) * `unidades_por_saca(codigo)` * qtd para put; null para call |
 | volatilidade_utilizada | DecimalField(8,6) (null) | Volatilidade historica anualizada (ultimos 252 pregoes) |
 | taxa_juros_utilizada | DecimalField(8,6) (null) | Taxa SELIC anual em decimal (ex: 0.1075 para 10,75%) |
 | d1 | DecimalField(12,6) (null) | Parametro d1 da formula Black-Scholes |

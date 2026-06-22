@@ -291,6 +291,8 @@ LBS_PER_SACA_KC      = 60 / 0.4536   # ~132.277
 BU_PER_MT_ZS         = 1000 / 27.216 # ~36.744
 ```
 
+`unidades_por_saca(codigo)` expoe o fator unidade-padrao -> saca de 60 kg (KC=`LBS_PER_SACA_KC`, ZC=`SACAS_PER_BUSHEL_ZC`, ZS=`SACAS_PER_BUSHEL_ZS`; codigo nao mapeado retorna 1.0 com warning). E usado pelo calculator (`valor_total_contrato`, `lucro_maximo`, curva de resultado) para converter premio/lucro de USD/unidade-padrao para USD/saca antes de escalar pela quantidade de sacas.
+
 #### Mapeamento B3
 
 | Codigo | Contrato B3 | Unidade B3 | Conversao para USD/unidade-padrao |
